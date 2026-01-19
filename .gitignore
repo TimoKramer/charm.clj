@@ -1,0 +1,20 @@
+# Clojure
+.cpcache/
+.nrepl-port
+*.class
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.calva/
+.clj-kondo/
+.lsp/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+target/
+classes/
