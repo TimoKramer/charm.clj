@@ -7,10 +7,26 @@ Build terminal applications using the Elm Architecture (Model-Update-View patter
 ## Features
 
 - **Elm Architecture** - Simple init/update/view pattern for predictable state management
+- **UI Components** - Spinner, text-input, list, paginator, timer, progress, help
 - **Styling** - Colors (ANSI, 256, true color), borders, padding, alignment
 - **Input handling** - Keyboard and mouse events with modifier support
 - **Efficient rendering** - Line diffing for minimal terminal updates
 - **core.async** - Asynchronous command execution
+
+## Documentation
+
+- **[Getting Started](docs/guides/getting-started.md)** - Build your first app
+- **[Components](docs/components/overview.md)** - UI component reference
+  - [spinner](docs/components/spinner.md), [text-input](docs/components/text-input.md), [list](docs/components/list.md), [paginator](docs/components/paginator.md), [timer](docs/components/timer.md), [progress](docs/components/progress.md), [help](docs/components/help.md)
+- **API Reference**
+  - [Program](docs/api/program.md) - run, cmd, batch, quit-cmd
+  - [Messages](docs/api/messages.md) - key-press, mouse, window-size
+  - [Styling](docs/api/styling.md) - style, render, colors, borders
+  - [Layout](docs/api/layout.md) - join-horizontal, join-vertical
+- **Guides**
+  - [Component Composition](docs/guides/component-composition.md)
+  - [Styling Patterns](docs/guides/styling-patterns.md)
+- **[Examples](docs/examples/)** - Runnable demo applications
 
 ## Installation
 
