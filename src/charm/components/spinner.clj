@@ -114,7 +114,7 @@
     {:type :cmd
      :fn (fn []
            (Thread/sleep interval)
-           (tick-msg id (inc tag)))}))
+           (tick-msg id tag))}))
 
 (defn spinner-init
   "Initialize the spinner, returns [spinner cmd].
