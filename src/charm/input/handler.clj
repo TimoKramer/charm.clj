@@ -3,10 +3,13 @@
 
    Reads raw terminal input and converts it to structured
    key and mouse events."
-  (:require [charm.input.keys :as keys]
-            [charm.input.mouse :as mouse])
-  (:import [org.jline.terminal Terminal]
-           [org.jline.utils NonBlockingReader]))
+  (:require
+   [charm.input.keys :as keys]
+   [charm.input.mouse :as mouse]
+   [clojure.string :as str])
+  (:import
+   [org.jline.terminal Terminal]
+   [org.jline.utils NonBlockingReader]))
 
 ;; ---------------------------------------------------------------------------
 ;; Input Reading
@@ -15,7 +18,7 @@
 (defn- read-char
   "Read a single character from the terminal with timeout.
    Returns the character code or -1 if timeout/EOF."
-  [^NonBlockingReader reader timeout-ms]
+  [^NonBlockingReader reader ^long timeout-ms]
   (.read reader timeout-ms))
 
 (defn- read-char-blocking
@@ -103,17 +106,17 @@
 (defn- x10-mouse-sequence?
   "Check if a CSI sequence is an X10 mouse sequence (CSI M)."
   [seq-str]
-  (and (clojure.string/starts-with? seq-str "[M")
+  (and (str/starts-with? seq-str "[M")
        (= (count seq-str) 5)))  ; [M + 3 bytes
 
 (defn- sgr-mouse-sequence?
   "Check if a CSI sequence is an SGR mouse sequence (CSI <)."
   [seq-str]
-  (clojure.string/starts-with? seq-str "[<"))
+  (str/starts-with? seq-str "[<"))
 
 (defn- parse-mouse-sequence
   "Parse a mouse sequence, returns mouse event or nil."
-  [seq-str]
+  [^String seq-str]
   (cond
     (x10-mouse-sequence? seq-str)
     (mouse/parse-x10-mouse

@@ -1,7 +1,9 @@
 (ns charm.components.text-input-test
-  (:require [clojure.test :refer [deftest testing is]]
-            [charm.components.text-input :as ti]
-            [charm.message :as msg]))
+  (:require
+   [charm.components.text-input :as ti]
+   [charm.message :as msg]
+   [clojure.string :as str]
+   [clojure.test :refer [deftest is testing]]))
 
 (deftest text-input-creation-test
   (testing "create text input with defaults"
@@ -129,18 +131,18 @@
 (deftest text-input-view-test
   (testing "view shows prompt and value"
     (let [input (ti/text-input :prompt "> " :value "hi" :focused false)]
-      (is (clojure.string/includes? (ti/text-input-view input) "> "))
-      (is (clojure.string/includes? (ti/text-input-view input) "hi"))))
+      (is (str/includes? (ti/text-input-view input) "> "))
+      (is (str/includes? (ti/text-input-view input) "hi"))))
 
   (testing "view shows placeholder when empty"
     (let [input (ti/text-input :placeholder "type here" :focused false)]
-      (is (clojure.string/includes? (ti/text-input-view input) "type here"))))
+      (is (str/includes? (ti/text-input-view input) "type here"))))
 
   (testing "password mode hides text"
     (let [input (ti/text-input :value "secret" :echo-mode :password :focused false)
           view (ti/text-input-view input)]
-      (is (not (clojure.string/includes? view "secret")))
-      (is (clojure.string/includes? view "******")))))
+      (is (not (str/includes? view "secret")))
+      (is (str/includes? view "******")))))
 
 (deftest text-input-init-test
   (testing "init returns input and nil command"

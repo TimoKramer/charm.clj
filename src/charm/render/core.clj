@@ -38,19 +38,21 @@
 ;; Terminal Output
 ;; ---------------------------------------------------------------------------
 
+(def ^"[Ljava.lang.Object;" empty-args (object-array 0))
+
 (defn- write-terminal!
   "Write directly to terminal."
-  [renderer s]
-  (let [terminal (:terminal @renderer)
-        writer (.writer terminal)]
+  [renderer ^String s]
+  (let [^Terminal terminal (:terminal @renderer)
+        ^java.io.PrintWriter writer (.writer terminal)]
     (.print writer s)
     (.flush writer)))
 
 (defn- puts!
   "Write terminal capability."
   [renderer capability]
-  (let [terminal (:terminal @renderer)]
-    (.puts terminal capability)
+  (let [^Terminal terminal (:terminal @renderer)]
+    (.puts terminal capability empty-args)
     (.flush terminal)))
 
 ;; ---------------------------------------------------------------------------

@@ -1,6 +1,8 @@
 (ns charm.components.help-test
-  (:require [clojure.test :refer [deftest testing is]]
-            [charm.components.help :as help]))
+  (:require
+   [charm.components.help :as help]
+   [clojure.string :as str]
+   [clojure.test :refer [deftest is testing]]))
 
 (deftest help-creation-test
   (testing "create help with binding maps"
@@ -58,24 +60,24 @@
     (let [h (help/help [{:key "j/k" :desc "up/down"}
                         {:key "q" :desc "quit"}])
           view (help/help-view h)]
-      (is (clojure.string/includes? view "j/k"))
-      (is (clojure.string/includes? view "up/down"))
-      (is (clojure.string/includes? view "q"))
-      (is (clojure.string/includes? view "quit"))))
+      (is (str/includes? view "j/k"))
+      (is (str/includes? view "up/down"))
+      (is (str/includes? view "q"))
+      (is (str/includes? view "quit"))))
 
   (testing "short view includes separator"
     (let [h (help/help [{:key "a" :desc "one"}
                         {:key "b" :desc "two"}]
                        :separator " | ")
           view (help/help-view h)]
-      (is (clojure.string/includes? view "|"))))
+      (is (str/includes? view "|"))))
 
   (testing "full view is multi-line"
     (let [h (help/help [{:key "j/k" :desc "up/down"}
                         {:key "q" :desc "quit"}]
                        :show-all true)
           view (help/help-view h)]
-      (is (clojure.string/includes? view "\n"))))
+      (is (str/includes? view "\n"))))
 
   (testing "empty bindings"
     (let [h (help/help [])

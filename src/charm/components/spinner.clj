@@ -110,7 +110,7 @@
   "Create a command that sends a tick message after the interval."
   [spinner]
   (let [{:keys [id tag spinner-type]} spinner
-        interval (:interval spinner-type)]
+        interval (long (:interval spinner-type))]
     {:type :cmd
      :fn (fn []
            (Thread/sleep interval)

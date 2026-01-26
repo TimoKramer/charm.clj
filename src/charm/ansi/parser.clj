@@ -1,7 +1,9 @@
 (ns charm.ansi.parser
   "ANSI escape sequence parsing.
 
-   Parses ANSI escape sequences into structured data for processing.")
+   Parses ANSI escape sequences into structured data for processing." 
+  (:require
+   [clojure.string :as str]))
 
 ;; ---------------------------------------------------------------------------
 ;; Constants
@@ -44,7 +46,7 @@
     (let [[_ params intermediate final] match
           param-list (when (and params (not (empty? params)))
                        (mapv #(if (empty? %) nil (parse-long %))
-                             (clojure.string/split params #";")))]
+                             (str/split params #";")))]
       {:type :csi
        :params (or param-list [])
        :intermediate intermediate
@@ -57,7 +59,7 @@
   [s]
   (when-let [match (re-find osc-pattern s)]
     (let [[_ content] match
-          [cmd & data-parts] (clojure.string/split content #";" 2)]
+          [cmd & data-parts] (str/split content #";" 2)]
       {:type :osc
        :command (when cmd (parse-long cmd))
        :data (first data-parts)
@@ -71,7 +73,7 @@
     (let [[_ params] match
           param-list (if (or (nil? params) (empty? params))
                        [0]  ; Reset
-                       (mapv parse-long (clojure.string/split params #";")))]
+                       (mapv parse-long (str/split params #";")))]
       {:type :sgr
        :params param-list
        :raw (first match)})))
@@ -191,7 +193,7 @@
    Accepts numbers or keywords from sgr-codes."
   [& params]
   (let [codes (map #(if (keyword? %) (get sgr-codes % 0) %) params)]
-    (str CSI (clojure.string/join ";" codes) "m")))
+    (str CSI (str/join ";" codes) "m")))
 
 (defn reset-style
   "Generate a reset SGR sequence."

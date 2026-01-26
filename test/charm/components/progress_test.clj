@@ -1,6 +1,8 @@
 (ns charm.components.progress-test
-  (:require [clojure.test :refer [deftest testing is]]
-            [charm.components.progress :as prog]))
+  (:require
+   [charm.components.progress :as prog]
+   [clojure.string :as str]
+   [clojure.test :refer [deftest is testing]]))
 
 (deftest progress-creation-test
   (testing "create progress bar with defaults"
@@ -86,31 +88,31 @@
   (testing "view shows filled and empty"
     (let [p (prog/progress-bar :width 10 :percent 0.5 :bar-style :ascii)
           view (prog/progress-view p)]
-      (is (clojure.string/includes? view "#"))
-      (is (clojure.string/includes? view "-"))))
+      (is (str/includes? view "#"))
+      (is (str/includes? view "-"))))
 
   (testing "view with brackets"
     (let [p (prog/progress-bar :width 12 :percent 0.5 :bar-style :brackets)
           view (prog/progress-view p)]
-      (is (clojure.string/starts-with? view "["))
-      (is (clojure.string/includes? view "]"))))
+      (is (str/starts-with? view "["))
+      (is (str/includes? view "]"))))
 
   (testing "view with percent"
     (let [p (prog/progress-bar :width 20 :percent 0.5 :show-percent true)
           view (prog/progress-view p)]
-      (is (clojure.string/includes? view "50%"))))
+      (is (str/includes? view "50%"))))
 
   (testing "view at 0%"
     (let [p (prog/progress-bar :width 10 :percent 0 :bar-style :ascii)
           view (prog/progress-view p)]
-      (is (not (clojure.string/includes? view "#")))
-      (is (clojure.string/includes? view "-"))))
+      (is (not (str/includes? view "#")))
+      (is (str/includes? view "-"))))
 
   (testing "view at 100%"
     (let [p (prog/progress-bar :width 10 :percent 1.0 :bar-style :ascii)
           view (prog/progress-view p)]
-      (is (clojure.string/includes? view "#"))
-      (is (not (clojure.string/includes? view "-"))))))
+      (is (str/includes? view "#"))
+      (is (not (str/includes? view "-"))))))
 
 (deftest progress-update-test
   (testing "update returns bar unchanged"

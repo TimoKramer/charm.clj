@@ -1,7 +1,9 @@
 (ns charm.components.list-test
-  (:require [clojure.test :refer [deftest testing is]]
-            [charm.components.list :as list]
-            [charm.message :as msg]))
+  (:require
+   [charm.components.list :as list]
+   [charm.message :as msg]
+   [clojure.string :as str]
+   [clojure.test :refer [deftest is testing]]))
 
 (deftest list-creation-test
   (testing "create list with strings"
@@ -166,19 +168,19 @@
   (testing "view shows items"
     (let [lst (list/item-list ["Apple" "Banana"])
           view (list/list-view lst)]
-      (is (clojure.string/includes? view "Apple"))
-      (is (clojure.string/includes? view "Banana"))))
+      (is (str/includes? view "Apple"))
+      (is (str/includes? view "Banana"))))
 
   (testing "view shows title"
     (let [lst (list/item-list ["A" "B"] :title "Fruits")
           view (list/list-view lst)]
-      (is (clojure.string/includes? view "Fruits"))))
+      (is (str/includes? view "Fruits"))))
 
   (testing "view shows cursor prefix on selected"
     (let [lst (list/item-list ["A" "B"] :cursor-prefix "> " :item-prefix "  ")
           view (list/list-view lst)]
-      (is (clojure.string/includes? view "> "))
-      (is (clojure.string/includes? view "  B")))))
+      (is (str/includes? view "> "))
+      (is (str/includes? view "  B")))))
 
 (deftest list-init-test
   (testing "init returns list and nil command"
@@ -190,7 +192,7 @@
 (deftest filter-convenience-test
   (testing "filter-items"
     (let [lst (-> (list/item-list ["Apple" "Apricot" "Banana"])
-                  (list/filter-items #(clojure.string/starts-with? % "A")))]
+                  (list/filter-items #(str/starts-with? % "A")))]
       (is (= ["Apple" "Apricot"] (list/items lst)))))
 
   (testing "find-item"

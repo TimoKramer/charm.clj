@@ -218,7 +218,7 @@
       (check-window-size! terminal msg-chan last-size)
 
       ;; Start input loop (returns thread)
-      (let [input-thread (start-input-loop! terminal msg-chan running?)]
+      (let [^Thread input-thread (start-input-loop! terminal msg-chan running?)]
 
         ;; Execute init command
         (execute-cmd! init-cmd msg-chan)

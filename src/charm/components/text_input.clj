@@ -169,7 +169,7 @@
   (set-cursor input (count (:value input))))
 
 (defn- whitespace? [c]
-  (Character/isWhitespace c))
+  (Character/isWhitespace (char c)))
 
 (defn- word-backward
   "Move cursor backward one word."

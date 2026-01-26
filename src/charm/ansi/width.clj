@@ -6,8 +6,11 @@
    - Wide characters (CJK, emojis = 2 cells)
    - Combining characters (zero width)
    - Grapheme clusters (emoji sequences)"
-  (:import [com.ibm.icu.text BreakIterator]
-           [java.lang Character$UnicodeBlock]))
+  (:require
+   [clojure.string :as str]) 
+  (:import
+   [com.ibm.icu.text BreakIterator]
+   [java.lang Character$UnicodeBlock]))
 
 ;; ---------------------------------------------------------------------------
 ;; ANSI Escape Sequence Handling
@@ -23,7 +26,7 @@
   [s]
   (if (nil? s)
     ""
-    (clojure.string/replace s ansi-pattern "")))
+    (str/replace s ansi-pattern "")))
 
 ;; ---------------------------------------------------------------------------
 ;; Character Width Calculation
@@ -163,7 +166,7 @@
               clusters (graphemes stripped)]
           (loop [result []
                  remaining clusters
-                 current-width 0]
+                 current-width (long 0)]
             (if (empty? remaining)
               (str (apply str result) tail)
               (let [g (first remaining)
@@ -173,7 +176,7 @@
                   (str (apply str result) tail)
                   (recur (conj result g)
                          (rest remaining)
-                         new-width))))))))))
+                         (long new-width)))))))))))
 
 (defn pad-right
   "Pad a string on the right to reach a target display width."

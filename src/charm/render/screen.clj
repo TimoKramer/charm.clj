@@ -64,7 +64,7 @@
   (str ESC "]2;" title "\u0007"))
 
 ;; Clipboard (OSC 52)
-(defn copy-to-clipboard [text]
+(defn copy-to-clipboard [^String text]
   (let [encoder (java.util.Base64/getEncoder)
         bytes (.getBytes text "UTF-8")
         encoded (.encodeToString encoder bytes)]

@@ -1,7 +1,9 @@
 (ns charm.components.paginator-test
-  (:require [clojure.test :refer [deftest testing is]]
-            [charm.components.paginator :as pag]
-            [charm.message :as msg]))
+  (:require
+   [charm.components.paginator :as pag]
+   [charm.message :as msg]
+   [clojure.string :as str]
+   [clojure.test :refer [deftest is testing]]))
 
 (deftest paginator-creation-test
   (testing "create paginator with defaults"
@@ -116,13 +118,13 @@
   (testing "dots view"
     (let [p (pag/paginator :total-pages 5 :page 2)
           view (pag/paginator-view p)]
-      (is (clojure.string/includes? view "○"))
-      (is (clojure.string/includes? view "•"))))
+      (is (str/includes? view "○"))
+      (is (str/includes? view "•"))))
 
   (testing "arabic view"
     (let [p (pag/paginator :total-pages 5 :page 2 :type :arabic)
           view (pag/paginator-view p)]
-      (is (clojure.string/includes? view "3/5")))))
+      (is (str/includes? view "3/5")))))
 
 (deftest paginator-init-test
   (testing "init returns pager and nil cmd"

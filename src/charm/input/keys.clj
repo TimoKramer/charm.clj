@@ -2,7 +2,9 @@
   "Key sequence definitions and parsing.
 
    Maps terminal escape sequences to key types and provides
-   utilities for key identification.")
+   utilities for key identification." 
+  (:require
+   [clojure.string :as str]))
 
 ;; ---------------------------------------------------------------------------
 ;; Key Types
@@ -227,8 +229,8 @@
 (defn escape-prefix?
   "Check if a string starts with a known escape sequence prefix."
   [s]
-  (or (clojure.string/starts-with? s "[")
-      (clojure.string/starts-with? s "O")))
+  (or (str/starts-with? s "[")
+      (str/starts-with? s "O")))
 
 ;; ---------------------------------------------------------------------------
 ;; Key Construction
@@ -265,7 +267,7 @@
     (every? (fn [[k v]] (= (get key k) v)) pattern)
 
     (string? pattern)
-    (let [parts (clojure.string/split (clojure.string/lower-case pattern) #"\+")
+    (let [parts (str/split (str/lower-case pattern) #"\+")
           mods (set (butlast parts))
           key-part (last parts)]
       (and (if (contains? mods "ctrl") (:ctrl key) (not (:ctrl key)))

@@ -44,26 +44,28 @@
   [^Terminal terminal]
   (.close terminal))
 
+(def ^"[Ljava.lang.Object;" empty-args (object-array 0))
+
 (defn hide-cursor
   "Hide the terminal cursor."
   [^Terminal terminal]
-  (.puts terminal InfoCmp$Capability/cursor_invisible)
+  (.puts terminal InfoCmp$Capability/cursor_invisible empty-args)
   (flush-output terminal))
 
 (defn show-cursor
   "Show the terminal cursor."
   [^Terminal terminal]
-  (.puts terminal InfoCmp$Capability/cursor_visible)
+  (.puts terminal InfoCmp$Capability/cursor_visible empty-args)
   (flush-output terminal))
 
 (defn clear-screen
   "Clear the terminal screen."
   [^Terminal terminal]
-  (.puts terminal InfoCmp$Capability/clear_screen)
+  (.puts terminal InfoCmp$Capability/clear_screen empty-args)
   (flush-output terminal))
 
 (defn move-cursor
   "Move cursor to position (0-indexed)."
   [^Terminal terminal col row]
-  (.puts terminal InfoCmp$Capability/cursor_address row col)
+  (.puts terminal InfoCmp$Capability/cursor_address (object-array [row col]))
   (flush-output terminal))

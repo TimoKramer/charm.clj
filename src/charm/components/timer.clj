@@ -112,10 +112,11 @@
 (defn- tick-cmd
   "Create a command that sends a tick message after the interval."
   [tmr]
-  (let [{:keys [id tag interval]} tmr]
+  (let [{:keys [id tag interval]} tmr
+        interval-ms (long interval)]
     {:type :cmd
      :fn (fn []
-           (Thread/sleep interval)
+           (Thread/sleep interval-ms)
            (tick-msg id tag))}))
 
 ;; ---------------------------------------------------------------------------
@@ -210,7 +211,7 @@
 (defn- format-duration
   "Format milliseconds as a human-readable duration."
   [ms]
-  (let [total-seconds (quot (Math/abs ms) 1000)
+  (let [total-seconds (quot (Math/abs (long ms)) 1000)
         hours (quot total-seconds 3600)
         minutes (quot (rem total-seconds 3600) 60)
         seconds (rem total-seconds 60)

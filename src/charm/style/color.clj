@@ -4,7 +4,9 @@
    Supports:
    - ANSI 16 basic colors (0-15)
    - ANSI 256 extended palette (0-255)
-   - True color RGB (24-bit)")
+   - True color RGB (24-bit)" 
+  (:require
+   [clojure.string :as str]))
 
 ;; ---------------------------------------------------------------------------
 ;; Color Profile Detection
@@ -93,7 +95,7 @@
 (defn hex
   "Create a true color from a hex string like \"#ff0000\" or \"ff0000\"."
   [hex-str]
-  (let [s (if (clojure.string/starts-with? hex-str "#")
+  (let [s (if (str/starts-with? hex-str "#")
             (subs hex-str 1)
             hex-str)
         r (Integer/parseInt (subs s 0 2) 16)
@@ -158,9 +160,9 @@
   (let [;; Check grayscale first (232-255)
         gray-start 232
         gray-levels 24
-        gray? (and (< (Math/abs (- r g)) 10)
-                   (< (Math/abs (- g b)) 10)
-                   (< (Math/abs (- r b)) 10))
+        gray? (and (< (Math/abs (long (- r g))) 10)
+                   (< (Math/abs (long (- g b))) 10)
+                   (< (Math/abs (long (- r b))) 10))
 
         ;; Convert to 6x6x6 color cube (16-231)
         cube-value (fn [v] (int (Math/round (/ (* v 5.0) 255.0))))

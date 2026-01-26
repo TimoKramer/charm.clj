@@ -100,15 +100,15 @@
         middle-width (- width left-width right-width)
         middle-chars (w/graphemes middle)
         middle-count (count middle-chars)]
-    (loop [result (StringBuilder. left-corner)
-           current-width 0
+    (loop [result (StringBuilder. ^String left-corner)
+           current-width (long 0)
            idx 0]
       (if (>= current-width middle-width)
         (str result right-corner)
         (let [c (nth middle-chars (mod idx middle-count))
               cw (w/grapheme-width c)]
           (recur (.append result c)
-                 (+ current-width cw)
+                 (long (+ current-width cw))
                  (inc idx)))))))
 
 (defn- style-text
