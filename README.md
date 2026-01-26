@@ -33,7 +33,7 @@ issues. I am planning to use it for something more sophisticated. Please expect 
 - **Guides**
   - [Component Composition](docs/guides/component-composition.md)
   - [Styling Patterns](docs/guides/styling-patterns.md)
-- **[Examples](docs/examples/)** - Runnable demo applications
+- **[Examples](docs/examples/README.md)** - Runnable demo applications
 
 ## Installation
 
