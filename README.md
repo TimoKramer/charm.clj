@@ -4,7 +4,8 @@
 
 A Clojure TUI (Terminal User Interface) library inspired by [Bubble Tea](https://github.com/charmbracelet/bubbletea).
 
-Build terminal applications using the Elm Architecture (Model-Update-View pattern) with a simple, functional API.
+Build terminal applications using the Elm Architecture (Model-Update-View pattern) with a simple, functional API. Run them
+on the JVM, as a native-image binary or on [babashka](https://babashka.org).
 
 ## Status
 
@@ -234,9 +235,15 @@ charm.clj/
 └── test/charm/           ; Tests
 ```
 
+## Testing
+
+```bash
+clojure -M:test
+```
+
 ## Dependencies
 
-- JDK 11+ (17+ recommended for full Unicode/emoji support)
+- JDK 22+
 - Clojure 1.12+
 - [JLine 3](https://github.com/jline/jline3) - Terminal I/O
 - [core.async](https://github.com/clojure/core.async) - Async message handling

@@ -4,8 +4,7 @@
    Provides a high-level rendering API that efficiently updates
    the terminal by only redrawing changed content."
   (:require [charm.render.screen :as scr]
-            [charm.terminal :as term]
-            [clojure.string :as str])
+            [charm.terminal :as term])
   (:import [org.jline.terminal Terminal]))
 
 ;; ---------------------------------------------------------------------------
