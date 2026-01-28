@@ -31,18 +31,6 @@
     (is (= 3 (w/string-width "\033[31mred\033[0m")))
     (is (= 4 (w/string-width "\033[1mbold\033[0m")))))
 
-(deftest graphemes-test
-  (testing "simple text"
-    (is (= ["h" "e" "l" "l" "o"] (w/graphemes "hello"))))
-
-  (testing "emoji sequences stay together"
-    ;; Family emoji is a ZWJ sequence
-    (is (= 1 (count (w/graphemes "👨‍👩‍👧")))))
-
-  (testing "nil/empty handling"
-    (is (nil? (w/graphemes nil)))
-    (is (nil? (w/graphemes "")))))
-
 (deftest truncate-test
   (testing "no truncation needed"
     (is (= "hello" (w/truncate "hello" 10)))

@@ -82,14 +82,10 @@
 ;; ---------------------------------------------------------------------------
 
 (defn- max-char-width
-  "Get the maximum display width of any character in a string."
+  "Get the display width of a border character string.
+   For typical single-grapheme border characters, this equals string-width."
   [s]
-  (if (or (nil? s) (empty? s))
-    0
-    (let [clusters (w/graphemes s)]
-      (if clusters
-        (reduce max 0 (map w/grapheme-width clusters))
-        0))))
+  (w/string-width s))
 
 (defn- render-horizontal-edge
   "Render a horizontal border edge (top or bottom)."
@@ -98,18 +94,14 @@
         left-width (w/string-width left-corner)
         right-width (w/string-width right-corner)
         middle-width (- width left-width right-width)
-        middle-chars (w/graphemes middle)
-        middle-count (count middle-chars)]
+        pattern-width (w/string-width middle)]
     (loop [result (StringBuilder. ^String left-corner)
-           current-width (long 0)
-           idx 0]
+           current-width (long 0)]
       (if (>= current-width middle-width)
         (str result right-corner)
-        (let [c (nth middle-chars (mod idx middle-count))
-              cw (w/grapheme-width c)]
-          (recur (.append result c)
-                 (long (+ current-width cw))
-                 (inc idx)))))))
+        (do
+          (.append result middle)
+          (recur result (+ current-width pattern-width)))))))
 
 (defn- style-text
   "Apply foreground and background color to text."
