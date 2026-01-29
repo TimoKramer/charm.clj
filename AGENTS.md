@@ -41,17 +41,15 @@ Always use proper `:require` and `:import` declarations in the `ns` form instead
 (java.lang.Math/abs x)
 ```
 
+# Git
+
+Use [Conventional Commits](https://www.conventionalcommits.org/): `type: description`
+
+Types: `feat`, `fix`, `refactor`, `perf`, `test`, `docs`, `chore`
+
 # Testing
 
 ## Running Tests via REPL
-
-When an nREPL server is running, run tests by evaluating line 4 in `user/dev.clj`:
-
-```clojure
-(run-all-tests #"charm\..*-test")
-```
-
-This is faster than running `clj -M:test` repeatedly.
 
 See [ADR 003: Testing Strategy](docs/adr/003-testing-strategy.md) for the full decision record.
 
