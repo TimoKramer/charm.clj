@@ -2,70 +2,35 @@
   (:require [clojure.test :refer [deftest is testing]]
             [charm.render.screen :as scr]))
 
-(deftest ansi-sequences-test
-  (testing "cursor movement"
-    (is (= "\u001b[5A" (scr/cursor-up 5)))
-    (is (= "\u001b[3B" (scr/cursor-down 3)))
-    (is (= "\u001b[10;20H" (scr/cursor-to 10 20))))
-
-  (testing "cursor visibility"
-    (is (= "\u001b[?25l" scr/cursor-hide))
-    (is (= "\u001b[?25h" scr/cursor-show)))
-
-  (testing "screen clearing"
-    (is (= "\u001b[2J" scr/clear-screen))
-    (is (= "\u001b[K" scr/clear-line)))
-
-  (testing "alt screen"
-    (is (= "\u001b[?1049h" scr/enter-alt-screen))
-    (is (= "\u001b[?1049l" scr/exit-alt-screen)))
-
-  (testing "mouse control"
+(deftest mouse-control-test
+  (testing "mouse control sequences"
     (is (= "\u001b[?1000h" scr/enable-mouse-normal))
+    (is (= "\u001b[?1000l" scr/disable-mouse-normal))
+    (is (= "\u001b[?1002h" scr/enable-mouse-cell-motion))
+    (is (= "\u001b[?1002l" scr/disable-mouse-cell-motion))
     (is (= "\u001b[?1003h" scr/enable-mouse-all-motion))
-    (is (= "\u001b[?1006h" scr/enable-mouse-sgr))))
+    (is (= "\u001b[?1003l" scr/disable-mouse-all-motion))
+    (is (= "\u001b[?1006h" scr/enable-mouse-sgr))
+    (is (= "\u001b[?1006l" scr/disable-mouse-sgr))))
+
+(deftest focus-reporting-test
+  (testing "focus reporting sequences"
+    (is (= "\u001b[?1004h" scr/enable-focus-reporting))
+    (is (= "\u001b[?1004l" scr/disable-focus-reporting))))
+
+(deftest bracketed-paste-test
+  (testing "bracketed paste sequences"
+    (is (= "\u001b[?2004h" scr/enable-bracketed-paste))
+    (is (= "\u001b[?2004l" scr/disable-bracketed-paste))))
 
 (deftest window-title-test
   (testing "sets window title"
     (is (= "\u001b]2;Hello\u0007" (scr/set-window-title "Hello")))))
 
-(deftest create-screen-test
-  (testing "creates screen with dimensions"
-    (let [screen (scr/create-screen 80 24)]
-      (is (= 80 (:width screen)))
-      (is (= 24 (:height screen)))
-      (is (= 24 (count (:lines screen))))
-      (is (every? empty? (:lines screen))))))
-
-(deftest set-line-test
-  (testing "sets a line in the screen"
-    (let [screen (scr/create-screen 80 24)
-          screen' (scr/set-line screen 5 "hello")]
-      (is (= "hello" (scr/get-line screen' 5)))))
-
-  (testing "ignores out of bounds"
-    (let [screen (scr/create-screen 80 24)
-          screen' (scr/set-line screen 100 "hello")]
-      (is (= screen screen')))))
-
-(deftest clear-test
-  (testing "clears all lines"
-    (let [screen (-> (scr/create-screen 80 24)
-                     (scr/set-line 0 "hello")
-                     (scr/set-line 1 "world")
-                     scr/clear)]
-      (is (every? empty? (:lines screen))))))
-
-(deftest lines-diff-test
-  (testing "finds changed lines"
-    (is (= [1 2] (scr/lines-diff ["a" "b" "c"] ["a" "x" "y"]))))
-
-  (testing "handles different lengths"
-    (is (= [2] (scr/lines-diff ["a" "b"] ["a" "b" "c"])))
-    (is (= [2] (scr/lines-diff ["a" "b" "c"] ["a" "b"]))))
-
-  (testing "empty when identical"
-    (is (= [] (scr/lines-diff ["a" "b"] ["a" "b"])))))
+(deftest clipboard-test
+  (testing "copies to clipboard using OSC 52"
+    ;; "Hello" in base64 is "SGVsbG8="
+    (is (= "\u001b]52;c;SGVsbG8=\u0007" (scr/copy-to-clipboard "Hello")))))
 
 (deftest content->lines-test
   (testing "splits on newlines"
@@ -83,15 +48,3 @@
 
   (testing "handles zero width"
     (is (= "hello" (scr/truncate-line "hello" 0)))))
-
-(deftest fit-content-test
-  (testing "fits content to dimensions"
-    (let [result (scr/fit-content "a\nb\nc\nd\ne" 10 3)]
-      ;; Should keep last 3 lines
-      (is (= 3 (count result)))
-      (is (= ["c" "d" "e"] result))))
-
-  (testing "truncates lines to width"
-    (let [result (scr/fit-content "hello world\nshort" 5 10)]
-      (is (= "hello" (first result)))
-      (is (= "short" (second result))))))

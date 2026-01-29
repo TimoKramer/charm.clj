@@ -21,19 +21,18 @@
                :update update-fn
                :view view})
    ```"
-  (:require [charm.terminal :as term]
-            [charm.message :as msg]
-            [charm.program :as prog]
-            [charm.style.core :as style]
-            [charm.style.color :as color]
-            [charm.style.border :as border]
-            [charm.components.spinner :as spinner]
-            [charm.components.text-input :as text-input]
-            [charm.components.list :as list-comp]
-            [charm.components.paginator :as paginator]
-            [charm.components.timer :as timer]
-            [charm.components.progress :as progress]
-            [charm.components.help :as help]))
+  (:require
+   [charm.components.help :as help]
+   [charm.components.list :as list-comp]
+   [charm.components.paginator :as paginator]
+   [charm.components.progress :as progress]
+   [charm.components.spinner :as spinner]
+   [charm.components.text-input :as text-input]
+   [charm.components.timer :as timer]
+   [charm.message :as msg]
+   [charm.program :as prog]
+   [charm.style.core :as style]
+   [charm.terminal :as term]))
 
 ;; ---------------------------------------------------------------------------
 ;; Re-exported from charm.message

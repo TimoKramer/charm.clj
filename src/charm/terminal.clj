@@ -70,3 +70,45 @@
   [^Terminal terminal col row]
   (.puts terminal InfoCmp$Capability/cursor_address (object-array [row col]))
   (flush-output terminal))
+
+(defn cursor-up
+  "Move cursor up n lines."
+  [^Terminal terminal n]
+  (.puts terminal InfoCmp$Capability/parm_up_cursor (object-array [n]))
+  (flush-output terminal))
+
+(defn cursor-down
+  "Move cursor down n lines."
+  [^Terminal terminal n]
+  (.puts terminal InfoCmp$Capability/parm_down_cursor (object-array [n]))
+  (flush-output terminal))
+
+(defn cursor-home
+  "Move cursor to home position (0,0)."
+  [^Terminal terminal]
+  (.puts terminal InfoCmp$Capability/cursor_home empty-args)
+  (flush-output terminal))
+
+(defn clear-to-end-of-line
+  "Clear from cursor to end of line."
+  [^Terminal terminal]
+  (.puts terminal InfoCmp$Capability/clr_eol empty-args)
+  (flush-output terminal))
+
+(defn clear-to-end-of-screen
+  "Clear from cursor to end of screen."
+  [^Terminal terminal]
+  (.puts terminal InfoCmp$Capability/clr_eos empty-args)
+  (flush-output terminal))
+
+(defn enter-alt-screen
+  "Enter alternate screen buffer."
+  [^Terminal terminal]
+  (.puts terminal InfoCmp$Capability/enter_ca_mode empty-args)
+  (flush-output terminal))
+
+(defn exit-alt-screen
+  "Exit alternate screen buffer."
+  [^Terminal terminal]
+  (.puts terminal InfoCmp$Capability/exit_ca_mode empty-args)
+  (flush-output terminal))

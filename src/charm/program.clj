@@ -7,13 +7,15 @@
    - view: state -> string
 
    Commands are functions that produce messages asynchronously."
-  (:require [clojure.core.async :as a :refer [go go-loop <! >! chan close!]]
-            [charm.terminal :as term]
-            [charm.render.core :as render]
-            [charm.input.handler :as input]
-            [charm.message :as msg])
-  (:import [org.jline.terminal Terminal]
-           [org.jline.utils Signals]))
+  (:require
+   [charm.input.handler :as input]
+   [charm.message :as msg]
+   [charm.render.core :as render]
+   [charm.terminal :as term]
+   [clojure.core.async :as a :refer [>! chan close! go]])
+  (:import
+   [org.jline.terminal Terminal]
+   [org.jline.utils Signals]))
 
 ;; ---------------------------------------------------------------------------
 ;; Command Helpers

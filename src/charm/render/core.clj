@@ -1,11 +1,12 @@
 (ns charm.render.core
-  "Terminal renderer with efficient diffing.
+  "Terminal renderer using JLine's Display for efficient diffing.
 
    Provides a high-level rendering API that efficiently updates
    the terminal by only redrawing changed content."
   (:require [charm.render.screen :as scr]
             [charm.terminal :as term])
-  (:import [org.jline.terminal Terminal]))
+  (:import [org.jline.terminal Terminal]
+           [org.jline.utils Display AttributedString]))
 
 ;; ---------------------------------------------------------------------------
 ;; Renderer State
@@ -20,24 +21,21 @@
      :hide-cursor - Hide cursor during rendering (default: true)"
   [^Terminal terminal & {:keys [fps alt-screen hide-cursor]
                          :or {fps 60 alt-screen false hide-cursor true}}]
-  (let [{:keys [width height]} (term/get-size terminal)]
+  (let [{:keys [width height]} (term/get-size terminal)
+        display (doto (Display. terminal false)
+                  (.resize height width))]
     (atom {:terminal terminal
+           :display display
            :fps fps
-           :frame-time (/ 1000 fps)
            :alt-screen alt-screen
            :hide-cursor hide-cursor
            :width width
            :height height
-           :last-lines []
-           :lines-rendered 0
-           :running false
-           :needs-render true})))
+           :running false})))
 
 ;; ---------------------------------------------------------------------------
 ;; Terminal Output
 ;; ---------------------------------------------------------------------------
-
-(def ^"[Ljava.lang.Object;" empty-args (object-array 0))
 
 (defn- write-terminal!
   "Write directly to terminal."
@@ -47,13 +45,6 @@
     (.print writer s)
     (.flush writer)))
 
-(defn- puts!
-  "Write terminal capability."
-  [renderer capability]
-  (let [^Terminal terminal (:terminal @renderer)]
-    (.puts terminal capability empty-args)
-    (.flush terminal)))
-
 ;; ---------------------------------------------------------------------------
 ;; Cursor Control
 ;; ---------------------------------------------------------------------------
@@ -61,17 +52,17 @@
 (defn show-cursor!
   "Show the terminal cursor."
   [renderer]
-  (write-terminal! renderer scr/cursor-show))
+  (term/show-cursor (:terminal @renderer)))
 
 (defn hide-cursor!
   "Hide the terminal cursor."
   [renderer]
-  (write-terminal! renderer scr/cursor-hide))
+  (term/hide-cursor (:terminal @renderer)))
 
 (defn move-cursor!
-  "Move cursor to position (1-indexed)."
-  [renderer row col]
-  (write-terminal! renderer (scr/cursor-to row col)))
+  "Move cursor to position (0-indexed)."
+  [renderer col row]
+  (term/move-cursor (:terminal @renderer) col row))
 
 ;; ---------------------------------------------------------------------------
 ;; Screen Control
@@ -81,31 +72,25 @@
   "Enter the alternate screen buffer."
   [renderer]
   (when-not (:alt-screen @renderer)
-    (write-terminal! renderer scr/enter-alt-screen)
-    (write-terminal! renderer scr/clear-screen)
-    (write-terminal! renderer scr/cursor-home)
-    (swap! renderer assoc
-           :alt-screen true
-           :last-lines []
-           :lines-rendered 0
-           :needs-render true)))
+    (let [terminal (:terminal @renderer)]
+      (term/enter-alt-screen terminal)
+      (term/clear-screen terminal)
+      (term/cursor-home terminal))
+    (swap! renderer assoc :alt-screen true)))
 
 (defn exit-alt-screen!
   "Exit the alternate screen buffer."
   [renderer]
   (when (:alt-screen @renderer)
-    (write-terminal! renderer scr/exit-alt-screen)
-    (swap! renderer assoc
-           :alt-screen false
-           :last-lines []
-           :lines-rendered 0)))
+    (term/exit-alt-screen (:terminal @renderer))
+    (swap! renderer assoc :alt-screen false)))
 
 (defn clear-screen!
   "Clear the screen."
   [renderer]
-  (write-terminal! renderer scr/clear-screen)
-  (write-terminal! renderer scr/cursor-home)
-  (swap! renderer assoc :last-lines [] :lines-rendered 0 :needs-render true))
+  (let [terminal (:terminal @renderer)]
+    (term/clear-screen terminal)
+    (term/cursor-home terminal)))
 
 ;; ---------------------------------------------------------------------------
 ;; Mouse Control
@@ -189,70 +174,32 @@
 ;; Rendering
 ;; ---------------------------------------------------------------------------
 
-(defn- render-diff!
-  "Render content using line diffing for efficiency."
-  [renderer new-lines]
-  (let [{:keys [width height last-lines lines-rendered]} @renderer
-        ;; Truncate to height
-        new-lines (if (and (pos? height) (> (count new-lines) height))
-                    (subvec new-lines (- (count new-lines) height))
-                    new-lines)
-        ;; Truncate each line to width
-        new-lines (if (pos? width)
-                    (mapv #(scr/truncate-line % width) new-lines)
-                    new-lines)
-        output (StringBuilder.)]
-
-    ;; Move cursor up to start of previous render
-    (when (> lines-rendered 1)
-      (.append output (scr/cursor-up (dec lines-rendered))))
-
-    ;; Render each line
-    (doseq [i (range (count new-lines))]
-      (let [old-line (get last-lines i)
-            new-line (get new-lines i)
-            can-skip (and old-line (= old-line new-line))]
-        (if can-skip
-          ;; Skip unchanged line, just move down
-          (when (< i (dec (count new-lines)))
-            (.append output (scr/cursor-down 1)))
-          ;; Render changed line
-          (do
-            (.append output "\r")
-            (.append output new-line)
-            (.append output scr/clear-line)
-            (when (< i (dec (count new-lines)))
-              (.append output "\n"))))))
-
-    ;; Clear any remaining lines from previous render
-    (when (> lines-rendered (count new-lines))
-      (.append output scr/clear-below))
-
-    (.append output "\r")
-
-    ;; Write to terminal
-    (write-terminal! renderer (str output))
-
-    ;; Update state
-    (swap! renderer assoc
-           :last-lines new-lines
-           :lines-rendered (count new-lines)
-           :needs-render false)))
-
 (defn render!
-  "Render content to the terminal.
+  "Render content to the terminal using JLine's Display for efficient diffing.
 
    Content can be a string (multi-line) which will be split
-   and rendered line by line with efficient diffing."
+   and rendered line by line."
   [renderer content]
-  (let [content (if (empty? content) " " content)
-        lines (vec (scr/content->lines content))]
-    (render-diff! renderer lines)))
+  (let [{:keys [^Display display width height]} @renderer
+        content (if (empty? content) " " content)
+        lines (scr/content->lines content)
+        ;; Truncate to height (keep last lines if overflow)
+        lines (if (and (pos? height) (> (count lines) height))
+                (subvec (vec lines) (- (count lines) height))
+                lines)
+        ;; Truncate each line to width and convert to AttributedString
+        attributed (mapv (fn [line]
+                           (AttributedString/fromAnsi
+                            (scr/truncate-line line width)))
+                         lines)]
+    ;; Display.update handles all the diffing internally
+    (.update display attributed -1)))
 
 (defn repaint!
   "Force a full repaint on next render."
   [renderer]
-  (swap! renderer assoc :last-lines [] :lines-rendered 0 :needs-render true))
+  (let [^Display display (:display @renderer)]
+    (.clear display)))
 
 ;; ---------------------------------------------------------------------------
 ;; Size Updates
@@ -261,8 +208,9 @@
 (defn update-size!
   "Update the renderer's size (call on window resize)."
   [renderer width height]
-  (swap! renderer assoc :width width :height height)
-  (repaint! renderer))
+  (let [^Display display (:display @renderer)]
+    (.resize display height width)
+    (swap! renderer assoc :width width :height height)))
 
 (defn get-size
   "Get the current terminal size [width height]."
