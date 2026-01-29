@@ -44,13 +44,16 @@
      (truncate \"hello world\" 8)           ; => \"hello...\"
      (truncate \"hello world\" 8 :tail \"…\") ; => \"hello w…\""
   [s width & {:keys [tail] :or {tail "..."}}]
-  (if (or (nil? s) (<= (string-width s) width))
+  (if (nil? s)
     s
-    (let [tail-width (string-width tail)
-          target-width (- width tail-width)]
-      (if (neg? target-width)
-        ""
-        (str (.columnSubSequence (AttributedString/fromAnsi s) 0 target-width) tail)))))
+    (let [attr-s (AttributedString/fromAnsi s)]
+      (if (<= (.columnLength attr-s) width)
+        s
+        (let [tail-width (string-width tail)
+              target-width (- width tail-width)]
+          (if (neg? target-width)
+            ""
+            (str (.columnSubSequence attr-s 0 target-width) tail)))))))
 
 (defn pad-right
   "Pad a string on the right to reach a target display width."
