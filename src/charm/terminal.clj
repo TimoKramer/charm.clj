@@ -1,6 +1,6 @@
 (ns charm.terminal
   "JLine terminal wrapper for charm.clj"
-  (:import [org.jline.terminal Terminal TerminalBuilder]
+  (:import [org.jline.terminal Terminal TerminalBuilder Attributes]
            [org.jline.utils InfoCmp$Capability]
            [java.nio.charset Charset]))
 
@@ -15,8 +15,20 @@
 (defn enter-raw-mode
   "Put terminal in raw mode for character-by-character input.
    Returns the previous Attributes for restoration."
-  [^Terminal terminal]
+  ^Attributes [^Terminal terminal]
   (.enterRawMode terminal))
+
+(defn get-attributes
+  "Get the terminal's current attributes.
+   Use this to save terminal state before modifications."
+  ^Attributes [^Terminal terminal]
+  (.getAttributes terminal))
+
+(defn set-attributes
+  "Set the terminal's attributes.
+   Use this to restore saved terminal state."
+  [^Terminal terminal ^Attributes attrs]
+  (.setAttributes terminal attrs))
 
 (defn get-size
   "Get terminal dimensions as {:width cols :height rows}."

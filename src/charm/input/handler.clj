@@ -4,10 +4,12 @@
    Reads raw terminal input and converts it to structured
    key and mouse events."
   (:require
+   [charm.input.keymap :as km]
    [charm.input.keys :as keys]
    [charm.input.mouse :as mouse]
    [clojure.string :as str])
   (:import
+   [org.jline.keymap KeyMap]
    [org.jline.terminal Terminal]
    [org.jline.utils NonBlockingReader]))
 
@@ -135,13 +137,17 @@
 
 (defn parse-input
   "Parse a raw input byte into an event.
-   For escape sequences, pass the sequence after ESC."
+   For escape sequences, pass the sequence after ESC.
+   Optionally accepts a KeyMap for terminal-aware sequence lookup."
   ([byte-val]
    (if (keys/ctrl-char? byte-val)
      (keys/parse-ctrl-char byte-val)
      {:type :runes :runes (str (char byte-val))}))
 
   ([byte-val escape-seq]
+   (parse-input byte-val escape-seq nil))
+
+  ([byte-val escape-seq ^KeyMap keymap]
    (if (nil? escape-seq)
      {:type :escape}  ; Just ESC
      (if-let [mouse (parse-mouse-sequence escape-seq)]
@@ -149,8 +155,10 @@
        (if (= (count escape-seq) 1)
          ;; Alt+key
          {:type :runes :runes escape-seq :alt true}
-         ;; Escape sequence
-         (keys/parse-escape-sequence escape-seq))))))
+         ;; Escape sequence - use keymap if provided
+         (if keymap
+           (keys/parse-escape-sequence keymap escape-seq)
+           (keys/parse-escape-sequence escape-seq)))))))
 
 ;; ---------------------------------------------------------------------------
 ;; High-Level Input Reading
@@ -161,8 +169,9 @@
    Returns an event map with :type and other keys, or nil on timeout.
 
    Options:
-     :timeout-ms - Timeout for reading (default 50)"
-  [^Terminal terminal & {:keys [timeout-ms] :or {timeout-ms 50}}]
+     :timeout-ms - Timeout for reading (default 50)
+     :keymap     - KeyMap for escape sequence lookup (optional, creates terminal-aware one if nil)"
+  [^Terminal terminal & {:keys [timeout-ms keymap] :or {timeout-ms 50}}]
   (let [reader (.reader terminal)
         c (read-char reader timeout-ms)]
     (cond
@@ -170,14 +179,18 @@
       nil  ; Timeout or EOF
 
       (= c ESC)
-      (parse-input c (read-escape-sequence reader timeout-ms))
+      (parse-input c (read-escape-sequence reader timeout-ms) keymap)
 
       :else
       (parse-input c))))
 
 (defn read-events
   "Create a lazy sequence of input events from the terminal.
-   Blocks waiting for each event."
+   Blocks waiting for each event.
+
+   Options:
+     :timeout-ms - Timeout for reading (default 50)
+     :keymap     - KeyMap for escape sequence lookup (optional)"
   [^Terminal terminal & opts]
   (lazy-seq
    (when-let [event (apply read-event terminal opts)]
@@ -191,15 +204,18 @@
   "Create an input handler for a terminal.
 
    Returns a map with:
-     :terminal - The terminal
+     :terminal   - The terminal
+     :keymap     - Terminal-aware KeyMap for escape sequences
      :read-event - Function to read next event
-     :stop - Function to stop the handler"
+     :stop       - Function to stop the handler"
   [^Terminal terminal]
-  (let [running (atom true)]
+  (let [running (atom true)
+        keymap (km/create-keymap terminal)]
     {:terminal terminal
+     :keymap keymap
      :running running
      :read-event (fn []
                    (when @running
-                     (read-event terminal)))
+                     (read-event terminal :keymap keymap)))
      :stop (fn []
              (reset! running false))}))

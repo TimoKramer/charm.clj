@@ -1,7 +1,9 @@
 {:paths ["src"]
  :deps {org.clojure/clojure {:mvn/version "1.12.4"}
         org.clojure/core.async {:mvn/version "1.8.741"}
-        org.jline/jline-terminal-ffm {:mvn/version "3.30.6"}}
+        org.jline/jline-terminal-ffm {:mvn/version "3.30.6"
+                                      :exclusions [org.jline/jline-native]}
+        org.jline/jline-reader {:mvn/version "3.30.6"}}
  :aliases
  {:test {:extra-paths ["test"]
          :extra-deps {io.github.cognitect-labs/test-runner {:git/tag "v0.5.1" :git/sha "dfb30dd"}}

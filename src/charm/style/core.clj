@@ -11,7 +11,7 @@
             [charm.style.layout :as l]
             [charm.ansi.width :as w]
             [clojure.string :as str])
-  (:import [org.jline.utils AttributedString AttributedStyle]))
+  (:import [org.jline.utils AttributedString AttributedStringBuilder AttributedStyle]))
 
 ;; ---------------------------------------------------------------------------
 ;; Style Definition
@@ -139,8 +139,11 @@
 ;; ANSI Sequence Generation (via JLine AttributedStyle)
 ;; ---------------------------------------------------------------------------
 
-(defn- style-map->attributed-style
-  "Convert style map to JLine AttributedStyle."
+(defn style->attributed-style
+  "Convert style map to JLine AttributedStyle.
+
+   Useful for direct AttributedString construction:
+     (AttributedString. text (style->attributed-style my-style))"
   ^AttributedStyle [{:keys [fg bg bold italic underline blink faint reverse]}]
   (cond-> AttributedStyle/DEFAULT
     bold      (.bold)
@@ -152,10 +155,28 @@
     fg        (c/apply-color-fg fg)
     bg        (c/apply-color-bg bg)))
 
+(defn attributed-string
+  "Create a JLine AttributedString with the given style applied.
+
+   This avoids the ANSI parse/unparse cycle when building content
+   that will be rendered directly via JLine's Display.
+
+   For single lines without layout (padding, border, margin):
+     (attributed-string my-style \"Hello!\")
+
+   For multiple parts with different styles:
+     (-> (AttributedStringBuilder.)
+         (.styled (style->attributed-style style1) \"part1\")
+         (.styled (style->attributed-style style2) \"part2\")
+         (.toAttributedString))"
+  ^AttributedString [style-map text]
+  (let [attr-style (style->attributed-style style-map)]
+    (AttributedString. ^String text attr-style)))
+
 (defn- apply-text-style
   "Apply text styling (colors and attributes) to a string."
   [text style]
-  (let [attr-style (style-map->attributed-style style)]
+  (let [attr-style (style->attributed-style style)]
     (if (= attr-style AttributedStyle/DEFAULT)
       text
       (->> (str/split-lines text)

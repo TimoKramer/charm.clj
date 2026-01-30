@@ -9,12 +9,13 @@
    Commands are functions that produce messages asynchronously."
   (:require
    [charm.input.handler :as input]
+   [charm.input.keymap :as km]
    [charm.message :as msg]
    [charm.render.core :as render]
    [charm.terminal :as term]
    [clojure.core.async :as a :refer [>! chan close! go]])
   (:import
-   [org.jline.terminal Terminal]
+   [org.jline.terminal Terminal Attributes]
    [org.jline.utils Signals]))
 
 ;; ---------------------------------------------------------------------------
@@ -99,11 +100,15 @@
   "Start reading terminal input and sending to message channel.
    Returns the thread so it can be interrupted on shutdown."
   [^Terminal terminal msg-chan running?]
-  (let [thread (Thread.
+  (let [;; Create terminal-aware keymap for escape sequence lookup
+        keymap (km/create-keymap terminal)
+        thread (Thread.
                 (fn []
                   (while @running?
                     (try
-                      (when-let [event (input/read-event terminal :timeout-ms 100)]
+                      (when-let [event (input/read-event terminal
+                                                         :timeout-ms 100
+                                                         :keymap keymap)]
                         ;; Convert input event to message
                         (let [m (cond
                                   (= :mouse (:type event))
@@ -172,9 +177,9 @@
   (let [opts (merge (default-opts) opts)
         {:keys [alt-screen mouse focus-reporting fps hide-cursor]} opts
 
-        ;; Create terminal
+        ;; Create terminal and save original attributes for restoration
         terminal (term/create-terminal)
-        _ (term/enter-raw-mode terminal)
+        ^Attributes original-attrs (term/enter-raw-mode terminal)
 
         ;; Create renderer
         renderer (render/create-renderer terminal
@@ -289,6 +294,9 @@
 
         ;; Stop renderer
         (render/stop! renderer)
+
+        ;; Restore terminal attributes before closing
+        (term/set-attributes terminal original-attrs)
 
         ;; Close terminal
         (term/close terminal)))))
