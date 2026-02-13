@@ -6,7 +6,8 @@
    - ClojureDocs export: docstrings, arglists, examples, see-alsos"
   (:require
    [clojure.edn :as edn]
-   [clojure.string :as str]))
+   [clojure.string :as str]
+   [clojure.walk :as walk]))
 
 ;; ---------------------------------------------------------------------------
 ;; ClojureDocs Data Loading
@@ -523,29 +524,18 @@
   (let [query (str/lower-case (str/trim (or query "")))]
     (if (str/blank? query)
       sects
-      (->> sects
-           (keep (fn [section]
-                   (let [subsections
-                         (->> (:subsections section)
-                              (keep (fn [subsection]
-                                      (let [groups
-                                            (->> (:groups subsection)
-                                                 (keep (fn [group]
-                                                         (let [fns (filterv
-                                                                    (fn [sym]
-                                                                      (str/includes?
-                                                                       (str/lower-case (name sym))
-                                                                       query))
-                                                                    (:fns group))]
-                                                           (when (seq fns)
-                                                             (assoc group :fns fns)))))
-                                                 vec)]
-                                        (when (seq groups)
-                                          (assoc subsection :groups groups)))))
-                              vec)]
-                     (when (seq subsections)
-                       (assoc section :subsections subsections)))))
-           vec))))
+      (let [match? #(str/includes? (str/lower-case (name %)) query)]
+        (->> sects
+             (walk/postwalk
+               (fn [node]
+                 (if-not (map? node)
+                   node
+                   (cond
+                     (:fns node)          (update node :fns #(filterv match? %))
+                     (:groups node)       (update node :groups #(filterv (comp seq :fns) %))
+                     (:subsections node)  (update node :subsections #(filterv (comp seq :groups) %))
+                     :else node))))
+             (filterv (comp seq :subsections)))))))
 
 (defn sections->grid
   "Convert sections into a grid: a vector of group rows.
