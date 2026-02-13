@@ -8,6 +8,7 @@
   (:require
    [charm.ansi.width :as ansi-width]
    [charm.components.help :as help]
+   [charm.components.viewport :as viewport]
    [charm.core :as charm]
    [charm.style.border :as border]
    [charm.style.core :as style]
@@ -262,6 +263,11 @@
 ;; Scroll Management
 ;; ---------------------------------------------------------------------------
 
+(defn- viewport-height
+  "Visible content lines (excluding border, title bar, help bar)."
+  [state]
+  (max 1 (- (max 10 (- (:height state) 2)) 9)))
+
 (defn- ensure-cursor-visible
   "Adjust scroll-offset so the cursor line is visible.
    cursor-line is the line index within the content area where the
@@ -278,6 +284,14 @@
       ;; Already visible
       :else state)))
 
+(declare render-content)
+
+(defn- adjust-scroll
+  "Recompute scroll-offset so the cursor stays visible."
+  [state]
+  (let [{:keys [cursor-line]} (render-content state)]
+    (ensure-cursor-visible state cursor-line (viewport-height state))))
+
 ;; ---------------------------------------------------------------------------
 ;; Update
 ;; ---------------------------------------------------------------------------
@@ -286,13 +300,13 @@
   (-> state
       (assoc :filter-focused true)
       (update :filter-input charm/text-input-focus)
-      (assoc :help (make-help :browse true) :width 70)))
+      (assoc :help (make-help :browse true))))
 
 (defn- blur-filter [state]
   (-> state
       (assoc :filter-focused false)
       (update :filter-input charm/text-input-blur)
-      (assoc :help (make-help :browse false) :width 70)))
+      (assoc :help (make-help :browse false))))
 
 (defn- clear-and-blur-filter [state]
   (-> state
@@ -328,7 +342,8 @@
     (charm/window-size? msg)
     [(-> state
          (assoc :width (:width msg))
-         (assoc :height (:height msg)))
+         (assoc :height (:height msg))
+         adjust-scroll)
      nil]
 
     ;; Global quit
@@ -342,17 +357,17 @@
       (cond
         ;; Vertical navigation: up/down moves between groups
         (or (charm/key-match? msg "down") (and (not (:filter-focused state)) (charm/key-match? msg "j")))
-        [(move-row state 1) nil]
+        [(adjust-scroll (move-row state 1)) nil]
 
         (or (charm/key-match? msg "up") (and (not (:filter-focused state)) (charm/key-match? msg "k")))
-        [(move-row state -1) nil]
+        [(adjust-scroll (move-row state -1)) nil]
 
         ;; Horizontal navigation: left/right moves between fns within a group
         (or (charm/key-match? msg "left") (and (not (:filter-focused state)) (charm/key-match? msg "h")))
-        [(move-col state -1) nil]
+        [(adjust-scroll (move-col state -1)) nil]
 
         (or (charm/key-match? msg "right") (and (not (:filter-focused state)) (charm/key-match? msg "l")))
-        [(move-col state 1) nil]
+        [(adjust-scroll (move-col state 1)) nil]
 
         ;; Enter opens overlay
         (charm/key-match? msg "enter")
@@ -395,7 +410,7 @@
         (or (charm/key-match? msg "down") (charm/key-match? msg "j")
             (charm/key-match? msg "up") (charm/key-match? msg "k")
             (charm/key-match? msg "ctrl+d") (charm/key-match? msg "ctrl+u"))
-        (let [[vp _] (charm/viewport-update (get-in state [:overlay :viewport]) msg)]
+        (let [[vp _] (viewport/viewport-update (get-in state [:overlay :viewport]) msg)]
           [(assoc-in state [:overlay :viewport] vp) nil])
 
         (charm/key-match? msg "n")
@@ -411,49 +426,76 @@
 ;; View: Content Rendering
 ;; ---------------------------------------------------------------------------
 
+(defn- render-group-fns
+  "Word-wrap a group's fns into lines.
+   Returns {:lines [str ...] :cursor-line <int-or-nil>}."
+  [{:keys [label fns]} label-width selected? col width line-offset]
+  (let [label-str (charm/render group-label-style (ansi-width/pad-right label label-width))
+        prefix (str "    " label-str "  ")
+        prefix-w (ansi-width/string-width prefix)
+        indent (apply str (repeat prefix-w " "))]
+    (loop [remaining (map-indexed vector fns)
+           line prefix, w prefix-w
+           out [], sel-line nil]
+      (if-let [[fi sym] (first remaining)]
+        (let [sel? (and selected? (= fi col))
+              text (if sel?
+                     (charm/render fn-selected-style (str " " (name sym) " "))
+                     (name sym))
+              tw (ansi-width/string-width text)
+              start? (= w prefix-w)
+              gap (if start? 0 1)
+              needed (+ w gap tw)]
+          (if (and (> needed width) (not start?))
+            (recur remaining indent prefix-w (conj out line) sel-line)
+            (recur (next remaining)
+                   (str line (when-not start? " ") text)
+                   (+ w gap tw)
+                   out
+                   (if sel? (+ (count out) line-offset) sel-line))))
+        {:lines (conj out line) :cursor-line sel-line}))))
+
 (defn- render-content
   "Render the full content area. Returns {:text string :cursor-line int}
    where cursor-line is the line index of the cursor function."
   [state]
   (let [sections (filtered-sections state)
-        grid (current-grid state)
         {:keys [row col]} (:cursor state)
-        ;; Account for thick border (2 cols) + some inner margin
-        width (max 40 (- (:width state) 6))
-        lines (atom [])
-        cursor-line (atom 0)
-        group-idx (atom 0)]
-    (doseq [[si section] (map-indexed vector sections)]
-      (when (pos? si)
-        (swap! lines conj ""))
-      (swap! lines conj (section-rule (:name section) width))
-      (swap! lines conj "")
-      (doseq [[ssi subsection] (map-indexed vector (:subsections section))]
-        (when (pos? ssi)
-          (swap! lines conj ""))
-        (swap! lines conj (str "  " (charm/render subsection-title-style (:name subsection))))
-        (let [label-width (reduce max 1 (map #(count (:label %)) (:groups subsection)))]
-          (doseq [group (:groups subsection)]
-            (let [gi @group-idx
-                  selected-row? (= gi row)
-                  fns-str (str/join " "
-                                    (map-indexed
-                                     (fn [fi sym]
-                                       (let [selected? (and selected-row? (= fi col))]
-                                         (when selected?
-                                           (reset! cursor-line (count @lines)))
-                                         (if selected?
-                                           (charm/render fn-selected-style
-                                                         (str " " (name sym) " "))
-                                           (name sym))))
-                                     (:fns group)))
-                  label-str (charm/render group-label-style
-                                          (ansi-width/pad-right (:label group) label-width))]
-              (swap! lines conj (str "    " label-str "  " fns-str))
-              (swap! group-idx inc))))))
-    (if (empty? @lines)
+        width (max 40 (- (:width state) 2))
+        ;; Flatten nested structure into tagged items
+        items (for [[si section] (map-indexed vector sections)
+                    item (concat
+                           (when (pos? si) [[:gap]])
+                           [[:rule (:name section)] [:gap]]
+                           (for [[ssi sub] (map-indexed vector (:subsections section))
+                                 :let [lw (reduce max 1 (map #(count (:label %)) (:groups sub)))]
+                                 item (concat
+                                        (when (pos? ssi) [[:gap]])
+                                        [[:heading (:name sub)]]
+                                        (map (fn [g] [:group g lw]) (:groups sub)))]
+                             item))]
+                item)
+        ;; Single reduce: build lines + track cursor + count groups
+        {:keys [lines cursor-line]}
+        (reduce
+          (fn [acc [tag & args]]
+            (case tag
+              :gap     (update acc :lines conj "")
+              :rule    (update acc :lines conj (section-rule (first args) width))
+              :heading (update acc :lines conj
+                               (str "  " (charm/render subsection-title-style (first args))))
+              :group   (let [[group lw] args
+                             result (render-group-fns group lw (= (:gi acc) row) col
+                                                      width (count (:lines acc)))]
+                         (-> acc
+                             (update :lines into (:lines result))
+                             (update :cursor-line #(or (:cursor-line result) %))
+                             (update :gi inc)))))
+          {:lines [] :cursor-line 0 :gi 0}
+          items)]
+    (if (empty? lines)
       {:text (charm/render dim-style "  No matching functions") :cursor-line 0}
-      {:text (str/join "\n" @lines) :cursor-line @cursor-line})))
+      {:text (str/join "\n" lines) :cursor-line cursor-line})))
 
 (def filter-field-width 30)
 
@@ -474,8 +516,8 @@
         ;; Filter field width including padding
         filter-rendered-width (reduce max 0 (map ansi-width/string-width filter-lines))
         title-width (ansi-width/string-width title)
-        ;; Account for thick border (2 cols) + left indent (2)
-        gap (max 2 (- (:width state) title-width filter-rendered-width 6))
+        ;; Inner content width (border=2) minus left indent (2)
+        gap (max 2 (- (:width state) title-width filter-rendered-width 4))
         gap-str (apply str (repeat gap " "))
         ;; Vertically center the title next to the 3-line filter field
         ;; Line 0: gap + filter top padding
@@ -504,9 +546,8 @@
 
 (defn- render-overlay-panel [state]
   (let [{:keys [fn-sym viewport]} (:overlay state)
-        overlay-width (max 40 (min 60 (- (:width state) 10)))
         title (str " " (namespace fn-sym) "/" (name fn-sym) " ")
-        content (charm/viewport-view viewport)
+        content (viewport/viewport-view viewport)
         bordered (charm/render (charm/style :border border/rounded
                                             :border-fg clj-blue
                                             :padding [0 1])
@@ -544,11 +585,9 @@
         ;; Help bar
         help-bar (render-help-bar state)
         ;; Render content
-        {:keys [text cursor-line]} (render-content state)
+        {:keys [text]} (render-content state)
         content-lines (str/split-lines text)
         total-lines (count content-lines)
-        ;; Ensure cursor is visible
-        state (ensure-cursor-visible state cursor-line content-height)
         scroll-offset (:scroll-offset state)
         ;; Clip content to viewport
         visible-lines (if (<= total-lines content-height)
@@ -567,9 +606,10 @@
         inner-view (str "\n" title-bar "\n\n"
                         content-str "\n\n"
                         help-bar)
-        ;; Wrap in thick border
+        ;; Wrap in thick border, filling the terminal width
         base-view (charm/render (charm/style :border border/thick
-                                             :border-fg clj-blue)
+                                             :border-fg clj-blue
+                                             :width (- width 2))
                                 inner-view)]
     ;; Apply overlay if in overlay mode
     (if (= :overlay (:mode state))
