@@ -76,6 +76,7 @@
 (def sequence-cmds prog/sequence-cmds)
 (def quit-cmd prog/quit-cmd)
 (def run prog/run)
+(def run-async prog/run-async)
 (def run-simple prog/run-simple)
 
 ;; ---------------------------------------------------------------------------

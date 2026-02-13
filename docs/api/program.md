@@ -40,19 +40,35 @@ Run a TUI program with the Elm Architecture pattern.
    :alt-screen true})
 ```
 
-### run-simple
+### run-async
 
 ```clojure
-(charm/run-simple options)
+(charm/run-async options)
 ```
 
-Simplified version with `:state` instead of `:init`.
+Run a TUI program in the background. Accepts the same options as `run` but returns immediately with a handle instead of blocking. Mainly for testing in the REPL.
+
+**Returns** a map with:
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `:quit!` | fn | Call to stop the program |
+| `:result` | promise | Deref to get the final state |
+
+**Example:**
 
 ```clojure
-(charm/run-simple
-  {:state {:count 0}
-   :update update-fn
-   :view view-fn})
+;; Start the app in the background
+(def app (charm/run-async {:init init
+                           :update update-fn
+                           :view view
+                           :alt-screen true}))
+
+;; Stop it from another thread / REPL
+((:quit! app))
+
+;; Get the final state (blocks until the app has stopped)
+@(:result app)
 ```
 
 ## Commands

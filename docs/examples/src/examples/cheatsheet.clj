@@ -547,6 +547,17 @@
 ;; Main
 ;; ---------------------------------------------------------------------------
 
+(comment
+  ; "Start the cheatsheet app in the background. Returns a handle:
+  ;    {:quit!  (fn [] ...) - stop the app
+  ;     :result (promise)   - deref to get the final state}"
+  ; []
+  (def app (charm/run-async {:init init
+                             :update update-fn
+                             :view view
+                             :alt-screen true}))
+  ((:quit! app)))
+
 (defn -main [& _args]
   (charm/run {:init init
               :update update-fn
