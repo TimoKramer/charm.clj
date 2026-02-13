@@ -112,24 +112,6 @@
 (def join-vertical style/join-vertical)
 
 ;; ---------------------------------------------------------------------------
-;; Convenience Macros
-;; ---------------------------------------------------------------------------
-
-(defmacro defprogram
-  "Define a TUI program with init, update, and view functions.
-
-   Usage:
-     (defprogram my-app
-       :init {:count 0}
-       :update (fn [state msg] ...)
-       :view (fn [state] ...))"
-  [name & {:keys [init update view] :as opts}]
-  `(def ~name
-     {:init ~init
-      :update ~update
-      :view ~view}))
-
-;; ---------------------------------------------------------------------------
 ;; Re-exported from charm.components.spinner
 ;; ---------------------------------------------------------------------------
 
