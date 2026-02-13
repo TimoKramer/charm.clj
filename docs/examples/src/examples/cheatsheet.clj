@@ -238,12 +238,12 @@
                                                    :width content-width)
                          :see-alsos see-alsos
                          :see-also-idx 0})
-        (assoc :help (make-help :overlay false) :width 70))))
+        (assoc :help (make-help :overlay false)))))
 
 (defn- close-overlay [state]
   (-> state
       (assoc :mode :browse)
-      (assoc :help (make-help :browse (:filter-focused state)) :width 70)))
+      (assoc :help (make-help :browse (:filter-focused state)))))
 
 (defn- next-see-also [state]
   (let [see-alsos (get-in state [:overlay :see-alsos])
