@@ -238,41 +238,41 @@
 
         ;; Main event loop
         (loop []
-         (when @running?
-           (when-let [m (a/<!! (a/timeout 10))]
+          (when @running?
+            (when-let [m (a/<!! (a/timeout 10))]
              ;; Timeout - just continue
-             nil)
+              nil)
 
-           (when-let [m (a/poll! msg-chan)]
-             (cond
+            (when-let [m (a/poll! msg-chan)]
+              (cond
                ;; Quit message
-               (msg/quit? m)
-               (reset! running? false)
+                (msg/quit? m)
+                (reset! running? false)
 
                ;; Error message
-               (= :error (:type m))
-               (do
-                 (reset! running? false)
-                 (throw (:error m)))
+                (= :error (:type m))
+                (do
+                  (reset! running? false)
+                  (throw (:error m)))
 
                ;; Window size
-               (= :window-size (:type m))
-               (do
-                 (render/update-size! renderer (:width m) (:height m))
-                 (let [[new-state cmd] (update @state m)]
-                   (reset! state new-state)
-                   (execute-cmd! cmd msg-chan)
-                   (render/render! renderer (view new-state))))
+                (= :window-size (:type m))
+                (do
+                  (render/update-size! renderer (:width m) (:height m))
+                  (let [[new-state cmd] (update @state m)]
+                    (reset! state new-state)
+                    (execute-cmd! cmd msg-chan)
+                    (render/render! renderer (view new-state))))
 
                ;; Regular message
-               :else
-               (let [[new-state cmd] (update @state m)]
-                 (reset! state new-state)
-                 (execute-cmd! cmd msg-chan)
-                 (render/render! renderer (view new-state)))))
+                :else
+                (let [[new-state cmd] (update @state m)]
+                  (reset! state new-state)
+                  (execute-cmd! cmd msg-chan)
+                  (render/render! renderer (view new-state)))))
 
-           (when @running?
-             (recur))))
+            (when @running?
+              (recur))))
 
         ;; Interrupt input thread
         (.interrupt input-thread))

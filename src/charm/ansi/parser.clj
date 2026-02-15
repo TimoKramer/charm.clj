@@ -1,7 +1,7 @@
 (ns charm.ansi.parser
   "ANSI escape sequence parsing.
 
-   Parses ANSI escape sequences into structured data for processing." 
+   Parses ANSI escape sequences into structured data for processing."
   (:require
    [clojure.string :as str]))
 

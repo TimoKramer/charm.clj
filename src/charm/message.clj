@@ -2,7 +2,7 @@
   "Message types for charm.clj TUI applications.
 
    Messages are plain maps with a :type key for easy pattern matching.
-   Use factory functions to create messages and predicates to check types." 
+   Use factory functions to create messages and predicates to check types."
   (:require
    [clojure.string :as string]))
 
