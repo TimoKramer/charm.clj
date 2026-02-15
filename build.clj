@@ -52,10 +52,9 @@
 
 (defn tag-release [_]
   (let [tag (tag-str)
-        git-name (or (System/getenv "GIT_COMMITTER_NAME") "Timo Kramer")
-        git-email (or (System/getenv "GIT_COMMITTER_EMAIL") "foo.bar@baz.meh")]
-    (b/git-process {:git-args ["config" "set" "--local" "user.name" git-name]})
-    (b/git-process {:git-args ["config" "set" "--local" "user.email" git-email]})
-    (b/git-process {:git-args ["config" "list"]})
-    (b/git-process {:git-args ["tag" "-a" tag "-m" (str "Release " tag)]})
+        git-name (or (System/getenv "GIT_COMMITTER_NAME") "github-actions[bot]")
+        git-email (or (System/getenv "GIT_COMMITTER_EMAIL") "41898282+github-actions[bot]@users.noreply.github.com")]
+    (b/git-process {:git-args ["-c" (str "user.name=" git-name)
+                               "-c" (str "user.email=" git-email)
+                               "tag" "-a" tag "-m" (str "Release " tag)]})
     (b/git-process {:git-args ["push" "--tags"]})))
