@@ -93,7 +93,9 @@ jobs:
           CLOJARS_PASSWORD: ${{ secrets.CLOJARS_PASSWORD }}
 
       - name: Tag release
-        run: clojure -T:build tag-release
         env:
-          GIT_COMMITTER_NAME: ${{ secrets.GIT_COMMITTER_NAME }}
           GIT_COMMITTER_EMAIL: ${{ secrets.GIT_COMMITTER_EMAIL }}
+        run: |
+          git config set user.name "Timo Kramer"
+          git config set user.email GIT_COMMITTER_EMAIL
+          clojure -T:build tag-release

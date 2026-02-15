@@ -51,10 +51,6 @@
               :pom-file (b/pom-path {:lib lib :class-dir class-dir})}))
 
 (defn tag-release [_]
-  (let [tag (tag-str)
-        git-name (or (System/getenv "GIT_COMMITTER_NAME") "github-actions[bot]")
-        git-email (or (System/getenv "GIT_COMMITTER_EMAIL") "41898282+github-actions[bot]@users.noreply.github.com")]
-    (b/git-process {:git-args ["-c" (str "user.name=" git-name)
-                               "-c" (str "user.email=" git-email)
-                               "tag" "-a" tag "-m" (str "Release " tag)]})
+  (let [tag (tag-str)]
+    (b/git-process {:git-args ["tag" "-a" tag]})
     (b/git-process {:git-args ["push" "--tags"]})))
