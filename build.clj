@@ -54,7 +54,8 @@
   (let [tag (tag-str)
         git-name (or (System/getenv "GIT_COMMITTER_NAME") "Timo Kramer")
         git-email (System/getenv "GIT_COMMITTER_EMAIL")]
-    (b/git-process {:git-args ["-c" (str "user.name=" git-name)
-                               "-c" (str "user.email=" git-email)
-                               "tag" "-a" tag "-m" (str "Release " tag)]})
+    (b/git-process {:git-args ["config" "set" "--local" "user.name" git-name]})
+    (b/git-process {:git-args ["config" "set" "--local" "user.email" git-email]})
+    (b/git-process {:git-args ["config" "list"]})
+    (b/git-process {:git-args ["tag" "-a" tag "-m" (str "Release " tag)]})
     (b/git-process {:git-args ["push" "--tags"]})))
