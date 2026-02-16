@@ -1,0 +1,310 @@
+>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────
+>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────
+> clojure -M -m examples.download
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────
+> clojure -M -m examples.download
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────
+> clojure -M -m examples.download
+Download Demo
+Demonstrating all progress bar styles
+
+default    ░░░░░░░░░░░░░░░░░░░░░░░░░   0%
+ascii      -------------------------   0%
+thin       ─────────────────────────   0%
+thick      ▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒   0%
+blocks     ░░░░░░░░░░░░░░░░░░░░░░░░░   0%
+arrows                                 0%
+dots       ○○○○○○○○○○○○○○○○○○○○○○○○○   0%
+brackets   [                       ]   0%
+
+Press Space to start download, Q to quit
+
+
+────────────────────────────────────────────────────────────────────────────────
+> clojure -M -m examples.download
+Download Demo
+Demonstrating all progress bar styles
+
+default    ░░░░░░░░░░░░░░░░░░░░░░░░░   0%
+ascii      -------------------------   0%
+thin       ─────────────────────────   0%
+thick      ▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒   0%
+blocks     ░░░░░░░░░░░░░░░░░░░░░░░░░   0%
+arrows                                 0%
+dots       ○○○○○○○○○○○○○○○○○○○○○○○○○   0%
+brackets   [                       ]   0%
+
+Press Space to start download, Q to quit
+
+
+────────────────────────────────────────────────────────────────────────────────
+> clojure -M -m examples.download
+Download Demo
+Demonstrating all progress bar styles
+
+default    ░░░░░░░░░░░░░░░░░░░░░░░░░   0%
+ascii      -------------------------   0%
+thin       ─────────────────────────   0%
+thick      ▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒   0%
+blocks     ░░░░░░░░░░░░░░░░░░░░░░░░░   0%
+arrows                                 0%
+dots       ○○○○○○○○○○○○○○○○○○○○○○○○○   0%
+brackets   [                       ]   0%
+
+Press Space to start download, Q to quit
+
+
+────────────────────────────────────────────────────────────────────────────────
+> clojure -M -m examples.download
+Download Demo
+Demonstrating all progress bar styles
+
+default    ░░░░░░░░░░░░░░░░░░░░░░░░░   0%
+ascii      -------------------------   0%
+thin       ─────────────────────────   0%
+thick      ▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒   0%
+blocks     ░░░░░░░░░░░░░░░░░░░░░░░░░   0%
+arrows                                 0%
+dots       ○○○○○○○○○○○○○○○○○○○○○○○○○   0%
+brackets   [                       ]   0%
+
+Downloading... Press R to reset, Q to quit
+
+
+────────────────────────────────────────────────────────────────────────────────
+> clojure -M -m examples.download
+Download Demo
+Demonstrating all progress bar styles
+
+default    █████████████████████████ 100% Done!
+ascii      ######################### 100% Done!
+thin       ━━━━━━━━━━━━━━━━━━━━━━━━━ 100% Done!
+thick      █████████████████████████ 100% Done!
+blocks     ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓ 100% Done!
+arrows     >>>>>>>>>>>>>>>>>>>>>>>>> 100% Done!
+dots       ●●●●●●●●●●●●●●●●●●●●●●●●● 100% Done!
+brackets   [=======================] 100% Done!
+
+All downloads complete!
+
+Press R to restart, Q to quit
+────────────────────────────────────────────────────────────────────────────────
+> clojure -M -m examples.download
+Download Demo
+Demonstrating all progress bar styles
+
+default    ░░░░░░░░░░░░░░░░░░░░░░░░░   0%
+ascii      -------------------------   0%
+thin       ─────────────────────────   0%
+thick      ▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒   0%
+blocks     ░░░░░░░░░░░░░░░░░░░░░░░░░   0%
+arrows                                 0%
+dots       ○○○○○○○○○○○○○○○○○○○○○○○○○   0%
+brackets   [                       ]   0%
+
+Press Space to start download, Q to quit
+
+
+────────────────────────────────────────────────────────────────────────────────
+> clojure -M -m examples.download
+Download Demo
+Demonstrating all progress bar styles
+
+default    ░░░░░░░░░░░░░░░░░░░░░░░░░   0%
+ascii      -------------------------   0%
+thin       ─────────────────────────   0%
+thick      ▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒   0%
+blocks     ░░░░░░░░░░░░░░░░░░░░░░░░░   0%
+arrows                                 0%
+dots       ○○○○○○○○○○○○○○○○○○○○○○○○○   0%
+brackets   [                       ]   0%
+
+Press Space to start download, Q to quit
+
+
+────────────────────────────────────────────────────────────────────────────────
+> clojure -M -m examples.download
+Download Demo
+Demonstrating all progress bar styles
+
+default    ░░░░░░░░░░░░░░░░░░░░░░░░░   0%
+ascii      -------------------------   0%
+thin       ─────────────────────────   0%
+thick      ▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒   0%
+blocks     ░░░░░░░░░░░░░░░░░░░░░░░░░   0%
+arrows                                 0%
+dots       ○○○○○○○○○○○○○○○○○○○○○○○○○   0%
+brackets   [                       ]   0%
+
+Downloading... Press R to reset, Q to quit
+
+
+────────────────────────────────────────────────────────────────────────────────
+> clojure -M -m examples.download
+Download Demo
+Demonstrating all progress bar styles
+
+default    ██████░░░░░░░░░░░░░░░░░░░  24%
+ascii      #####--------------------  22%
+thin       ━━━━━━━──────────────────  29%
+thick      ██████▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒  25%
+blocks     ▓▓▓▓▓▓░░░░░░░░░░░░░░░░░░░  26%
+arrows     >>>>>                      21%
+dots       ●●●●●●○○○○○○○○○○○○○○○○○○○  24%
+brackets   [======                 ]  27%
+
+Downloading... Press R to reset, Q to quit
+
+
+────────────────────────────────────────────────────────────────────────────────
+> clojure -M -m examples.download
+Download Demo
+Demonstrating all progress bar styles
+
+default    ██████░░░░░░░░░░░░░░░░░░░  24%
+ascii      #####--------------------  22%
+thin       ━━━━━━━──────────────────  29%
+thick      ██████▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒  25%
+blocks     ▓▓▓▓▓▓░░░░░░░░░░░░░░░░░░░  26%
+arrows     >>>>>                      21%
+dots       ●●●●●●○○○○○○○○○○○○○○○○○○○  24%
+brackets   [======                 ]  27%
+
+Downloading... Press R to reset, Q to quit
+
+
+────────────────────────────────────────────────────────────────────────────────

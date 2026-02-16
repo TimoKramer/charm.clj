@@ -186,3 +186,13 @@
   "Check if a mouse event is a middle click."
   [event]
   (and (click? event) (= (:button event) button-middle)))
+
+(defn wheel-up?
+  "Check if a mouse event is a wheel up."
+  [event]
+  (and (wheel? event) (= (:button event) button-wheel-up)))
+
+(defn wheel-down?
+  "Check if a mouse event is a wheel down."
+  [event]
+  (and (wheel? event) (= (:button event) button-wheel-down)))

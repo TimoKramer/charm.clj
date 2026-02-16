@@ -43,6 +43,20 @@ jobs:
       - name: Test
         run: clojure -M:test
 
+      - name: Test bb
+        run: |
+          bash <(curl https://raw.githubusercontent.com/babashka/babashka/master/install) --dev-build --dir /tmp
+          /tmp/bb test:bb
+
+      - name: Run vhs
+        run: |
+          sudo apt-get -qq update
+          sudo apt-get -qq install -y ffmpeg ttyd
+          go install github.com/charmbracelet/vhs@v0.10.0
+          cd docs/examples/
+          ${HOME}/go/bin/vhs vhs/pomodoro.tape
+          ${HOME}/go/bin/vhs vhs/download.tape
+
       - name: Build JAR
         run: clojure -T:build jar
 

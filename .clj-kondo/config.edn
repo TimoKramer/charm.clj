@@ -1,0 +1,2 @@
+{:config-in-ns {charm.integration.input-test
+                {:linters {:unresolved-symbol {:level :off}}}}}
