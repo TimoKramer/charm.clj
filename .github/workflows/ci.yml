@@ -26,12 +26,15 @@ jobs:
           clj-kondo: latest
           cljfmt: latest
 
-      - name: Install vhs
-        uses: charmbracelet/vhs-action@v1
+      - name: Run vhs pomodoro
+        uses: charmbracelet/vhs-action@v2.1.0
         with:
-          path:
-            - 'docs/examples/vhs/pomodoro.tape'
-            - 'docs/examples/vhs/download.tape'
+          path: docs/examples/vhs/pomodoro.tape
+
+      - name: Run vhs download
+        uses: charmbracelet/vhs-action@v2.1.0
+        with:
+          path: docs/examples/vhs/download.tape
 
       - uses: actions/cache@v4
         with:
