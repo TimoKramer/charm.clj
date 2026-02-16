@@ -134,16 +134,15 @@
 
 (defn- bind-from-capability!
   "Bind a key from terminal capability, stripping ESC prefix.
-   Returns nil if terminal is nil."
+   Returns nil if terminal is nil or capability not found."
   [^KeyMap keymap ^Terminal terminal ^InfoCmp$Capability cap event]
   (when terminal
-    (when-let [seq (KeyMap/key terminal cap)]
-      ;; JLine's key() returns the full sequence including ESC
-      ;; We need to strip the ESC since we read sequences after ESC
-      (let [seq-str (String. ^chars seq)]
-        (when (and (pos? (count seq-str))
-                   (= (int (first seq-str)) 27))
-          (bind-key! keymap (subs seq-str 1) event))))))
+    ;; JLine's getStringCapability returns the full sequence including ESC
+    ;; We need to strip the ESC since we read sequences after ESC
+    (when-let [seq-str (.getStringCapability terminal cap)]
+      (when (and (pos? (count seq-str))
+                 (= (int (first seq-str)) 27))
+        (bind-key! keymap (subs seq-str 1) event)))))
 
 (defn- bind-fallback-sequences!
   "Bind fallback sequences for a key."
