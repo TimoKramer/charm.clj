@@ -45,16 +45,22 @@ jobs:
       - name: Test
         run: clojure -M:test
 
+      - name: Test bb
+        run: |
+          bash <(curl https://raw.githubusercontent.com/babashka/babashka/master/install) --dev-build --dir /tmp
+          /tmp/bb test:bb
+
       - name: Run vhs
         run: |
           sudo apt update
           sudo apt install -y ffmpeg ttyd
           go install github.com/charmbracelet/vhs@v0.10.0
-          ${HOME}/go/bin/vhs docs/examples/vhs/download.tape
-          ${HOME}/go/bin/vhs docs/examples/vhs/pomodoro.tape
+          cd docs/examples/
+          ${HOME}/go/bin/vhs vhs/download.tape
+          ${HOME}/go/bin/vhs vhs/pomodoro.tape
           ls -lahrtR
-          diff pomodoro.ascii docs/examples/test/pomodoro.ascii
-          diff download.ascii docs/examples/test/download.ascii
+          diff pomodoro.ascii test/pomodoro.ascii
+          diff download.ascii test/download.ascii
 
       - name: Build JAR
         run: clojure -T:build jar
