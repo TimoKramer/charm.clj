@@ -26,6 +26,13 @@ jobs:
           clj-kondo: latest
           cljfmt: latest
 
+      - name: Install vhs
+        uses: charmbracelet/vhs-action@v1
+        with:
+          path:
+            - 'docs/examples/vhs/pomodoro.tape'
+            - 'docs/examples/vhs/download.tape'
+
       - uses: actions/cache@v4
         with:
           path: |
@@ -42,6 +49,12 @@ jobs:
 
       - name: Test
         run: clojure -M:test
+
+      - name: Test vhs
+        run: |
+          ls -lahrtR
+          diff pomodoro.ascii docs/examples/test/pomodoro.ascii
+          diff download.ascii docs/examples/test/download.ascii
 
       - name: Build JAR
         run: clojure -T:build jar

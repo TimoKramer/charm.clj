@@ -1,0 +1,344 @@
+>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────
+>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────
+> clojure -M -m examples.pomodoro
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────
+> clojure -M -m examples.pomodoro
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────
+> clojure -M -m examples.pomodoro
+Pomodoro Timer
+
+Select your focus mode:
+
+> 25/5 - Classic Pomodoro
+  50/10 - Extended Focus
+
+↑/↓ to select, Enter to start, q to quit
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────
+> clojure -M -m examples.pomodoro
+Pomodoro Timer
+
+Select your focus mode:
+
+> 25/5 - Classic Pomodoro
+  50/10 - Extended Focus
+
+↑/↓ to select, Enter to start, q to quit
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────
+> clojure -M -m examples.pomodoro
+Pomodoro Timer
+
+Select your focus mode:
+
+> 25/5 - Classic Pomodoro
+  50/10 - Extended Focus
+
+↑/↓ to select, Enter to start, q to quit
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────
+> clojure -M -m examples.pomodoro
+Pomodoro Timer
+
+Select your focus mode:
+
+  25/5 - Classic Pomodoro
+> 50/10 - Extended Focus
+
+↑/↓ to select, Enter to start, q to quit
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────
+> clojure -M -m examples.pomodoro
+Pomodoro Timer
+
+Select your focus mode:
+
+  25/5 - Classic Pomodoro
+> 50/10 - Extended Focus
+
+↑/↓ to select, Enter to start, q to quit
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────
+> clojure -M -m examples.pomodoro
+WORK (cycle 1)
+
+▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒  50:00
+
+p to pause/resume, q to quit
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────
+> clojure -M -m examples.pomodoro
+WORK (cycle 1)
+
+▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒  49:58
+
+p to pause/resume, q to quit
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────
+> clojure -M -m examples.pomodoro
+WORK (cycle 1)  PAUSED
+
+▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒  49:58
+
+p to resume, q to quit
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────
+> clojure -M -m examples.pomodoro
+WORK (cycle 1)  PAUSED
+
+▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒  49:58
+
+p to resume, q to quit
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────
+> clojure -M -m examples.pomodoro
+WORK (cycle 1)
+
+▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒  49:58
+
+p to pause/resume, q to quit
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────
+> clojure -M -m examples.pomodoro
+WORK (cycle 1)
+
+▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒  49:56
+
+p to pause/resume, q to quit
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────
+> clojure -M -m examples.pomodoro
+WORK (cycle 1)
+
+▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒  49:56
+
+p to pause/resume, q to quit
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────

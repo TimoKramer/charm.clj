@@ -1,15 +1,19 @@
+Output pomodoro.ascii
 Output pomodoro.gif
 
-Set Shell "zsh"
-Set FontSize 32
-Set Width 1200
-Set Height 600
+Set Shell zsh
 
-Type "../../../babashka/bb -cp ../../src:src -m examples.pomodoro" Sleep 500ms  Enter
+Type "clojure -M -m examples.pomodoro"
 Enter
+Wait+Screen /Pomodoro\sTimer/
+Up
 Sleep 1s
-Type "p"
+Down
 Sleep 1s
+Enter
+Sleep 2s
 Type "p"
-
-Sleep 5s
+Sleep 2s
+Type "p"
+Sleep 2s
+Type "q"
