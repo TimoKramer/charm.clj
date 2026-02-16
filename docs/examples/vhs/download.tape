@@ -1,7 +1,7 @@
 Output download.ascii
 Output download.gif
 
-Set Shell zsh
+Set Shell bash
 
 Type "clojure -M -m examples.download"
 Enter

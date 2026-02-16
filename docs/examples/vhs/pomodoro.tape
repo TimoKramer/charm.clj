@@ -1,7 +1,7 @@
 Output pomodoro.ascii
 Output pomodoro.gif
 
-Set Shell zsh
+Set Shell bash
 
 Type "clojure -M -m examples.pomodoro"
 Enter
