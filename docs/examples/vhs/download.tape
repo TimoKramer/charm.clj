@@ -1,5 +1,4 @@
 Output download.ascii
-Output download.gif
 
 Set Shell zsh
 
