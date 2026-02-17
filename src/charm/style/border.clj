@@ -152,11 +152,15 @@
            top
            (if right? top-right "")
            total-width))])
-      ;; Content lines with side borders
+      ;; Content lines with side borders (padded to equal width)
       (for [line lines]
-        (str (when left? (style-border left))
-             line
-             (when right? (style-border right))))
+        (let [pad-count (- content-width (w/string-width line))
+              padded (if (pos? pad-count)
+                       (str line (apply str (repeat pad-count " ")))
+                       line)]
+          (str (when left? (style-border left))
+               padded
+               (when right? (style-border right)))))
       ;; Bottom border
       (when bottom?
         [(style-border
