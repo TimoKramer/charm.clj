@@ -2,7 +2,7 @@ Output images/counter.gif
 
 Set Shell bash
 
-Type "clojure -M -m examples.counter"
+Type "bb counter"
 Enter
 Wait+Screen /Counter\sApp/
 Sleep 1s

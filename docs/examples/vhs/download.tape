@@ -2,7 +2,7 @@ Output images/download.gif
 
 Set Shell bash
 
-Type "clojure -M -m examples.download"
+Type "bb download"
 Enter
 Wait+Screen /Download\sDemo/
 Enter

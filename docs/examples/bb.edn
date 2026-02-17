@@ -1,0 +1,31 @@
+{:paths ["src" "../../src"]
+ :tasks
+ {cheatsheet {:doc "Run cheatsheet example"
+              :task (exec 'examples.cheatsheet/-main)}
+
+  countdown {:doc "Run countdown example"
+             :task (exec 'examples.countdown/-main)}
+
+  counter {:doc "Run counter example"
+           :task (exec 'examples.counter/-main)}
+
+  download {:doc "Run download example"
+            :task (exec 'examples.download/-main)}
+
+  file-browser {:doc "Run file browser example"
+                :task (exec 'examples.file-browser/-main)}
+
+  form {:doc "Run form example"
+        :task (exec 'examples.form/-main)}
+
+  pomodoro {:doc "Run pomodoro example"
+            :task (exec 'examples.pomodoro/-main)}
+
+  spinner {:doc "Run spinner demo"
+           :task (exec 'examples.spinner-demo/-main)}
+
+  timer {:doc "Run timer example"
+         :task (exec 'examples.timer/-main)}
+
+  todos {:doc "Run todos example"
+         :task (exec 'examples.todos/-main)}}}

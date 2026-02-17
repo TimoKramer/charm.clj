@@ -2,7 +2,7 @@ Output images/pomodoro.gif
 
 Set Shell bash
 
-Type "clojure -M -m examples.pomodoro"
+Type "bb pomodoro"
 Enter
 Wait+Screen /Pomodoro\sTimer/
 Up

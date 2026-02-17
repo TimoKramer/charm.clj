@@ -2,7 +2,7 @@ Output images/countdown.gif
 
 Set Shell bash
 
-Type "clojure -M -m examples.countdown"
+Type "bb countdown"
 Enter
 Wait+Screen /Countdown\sTimer/
 Type " "

@@ -2,7 +2,7 @@ Output images/spinner.gif
 
 Set Shell bash
 
-Type "clojure -M -m examples.spinner-demo"
+Type "bb spinner"
 Enter
 Wait+Screen /Spinner\sDemo/
 Sleep 8s

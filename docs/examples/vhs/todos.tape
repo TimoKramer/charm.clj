@@ -2,7 +2,7 @@ Output images/todos.gif
 
 Set Shell bash
 
-Type "clojure -M -m examples.todos"
+Type "bb todos"
 Enter
 Wait+Screen /Todo\sList/
 Sleep 2s

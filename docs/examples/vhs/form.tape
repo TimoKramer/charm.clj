@@ -2,7 +2,7 @@ Output images/form.gif
 
 Set Shell bash
 
-Type "clojure -M -m examples.form"
+Type "bb form"
 Enter
 Wait+Screen /Login\sForm/
 Sleep 1s
