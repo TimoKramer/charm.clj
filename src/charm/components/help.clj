@@ -28,11 +28,12 @@
      :key-style      - Style for key text
      :desc-style     - Style for description text
      :separator-style - Style for separator
+     :bg             - Background color for the entire help bar
      :ellipsis       - Ellipsis when truncated (default \"…\")
      :id             - Unique ID"
   [bindings & {:keys [width separator show-all
                       key-style desc-style separator-style
-                      ellipsis id]
+                      bg ellipsis id]
                :or {width 0
                     separator " • "
                     show-all false
@@ -48,9 +49,13 @@
    :width width
    :separator separator
    :show-all show-all
-   :key-style (or key-style (style/style :bold true))
-   :desc-style (or desc-style (style/style :fg 240))
-   :separator-style (or separator-style (style/style :fg 240))
+   :bg bg
+   :key-style (cond-> (or key-style (style/style :bold true))
+                bg (assoc :bg bg))
+   :desc-style (cond-> (or desc-style (style/style :fg 240))
+                 bg (assoc :bg bg))
+   :separator-style (cond-> (or separator-style (style/style :fg 240))
+                      bg (assoc :bg bg))
    :ellipsis ellipsis})
 
 ;; ---------------------------------------------------------------------------
@@ -96,16 +101,22 @@
 ;; Help View
 ;; ---------------------------------------------------------------------------
 
+(defn- render-bg
+  "Render text with the help background color, or return as-is if no bg."
+  [bg text]
+  (if bg
+    (style/render (style/style :bg bg) text)
+    text))
+
 (defn- render-binding
   "Render a single binding."
-  [hlp binding]
-  (let [{:keys [key-style desc-style]} hlp
-        {:keys [key desc]} binding]
+  [hlp {key :key desc :desc}]
+  (let [{:keys [bg key-style desc-style]} hlp]
     (str (style/render key-style key)
-         " "
+         (render-bg bg " ")
          (style/render desc-style desc))))
 
-(defn- short-help-view
+(defn short-help-view
   "Render short help (single line)."
   [hlp]
   (let [{:keys [bindings width separator separator-style ellipsis]} hlp
@@ -129,27 +140,17 @@
                 new-width (+ current-width sep-width item-width)]
             (if (and (pos? width) (> new-width width) (seq result))
               ;; Would exceed width, add ellipsis and stop
-              (str (str/join sep result) sep ellipsis)
+              (str (str/join sep result) sep (render-bg (:bg hlp) ellipsis))
               (recur (conj result rendered)
                      (rest remaining)
                      new-width))))))))
 
-(defn- full-help-view
+(defn full-help-view
   "Render full help (multi-line grouped)."
   [hlp]
-  (let [{:keys [bindings key-style desc-style]} hlp]
-    (str/join "\n"
-              (for [{:keys [key desc]} bindings]
-                (str (style/render key-style (format "%-10s" key))
-                     " "
-                     (style/render desc-style desc))))))
-
-(defn help-view
-  "Render the help to a string."
-  [hlp]
-  (if (:show-all hlp)
-    (full-help-view hlp)
-    (short-help-view hlp)))
+  (str/join "\n"
+            (for [b (:bindings hlp)]
+              (render-binding hlp b))))
 
 ;; ---------------------------------------------------------------------------
 ;; Help Update (stateless - typically just toggle show-all)

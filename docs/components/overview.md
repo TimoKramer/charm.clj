@@ -105,7 +105,7 @@ Multiple components can be combined in a single application:
 (defn view [state]
   (str (charm/text-input-view (:input state)) "\n"
        (charm/list-view (:list state)) "\n"
-       (charm/help-view (:help state))))
+       (charm/short-help-view (:help state))))
 ```
 
 ## Styling Components

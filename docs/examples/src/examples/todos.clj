@@ -2,6 +2,7 @@
   "Full todo application demonstrating component composition:
    list + text-input + help working together."
   (:require [charm.core :as charm]
+            [charm.components.help :as help]
             [clojure.string :as str]))
 
 (def title-style
@@ -200,9 +201,9 @@
          ;; Help
          (if show-full-help?
            (str (charm/render (charm/style :bold true) "Keyboard Shortcuts") "\n"
-                (charm/help-view help) "\n\n"
+                (help/full-help-view help) "\n\n"
                 (charm/render hint-style "Press ? to hide help"))
-           (charm/help-view help)))))
+           (help/short-help-view help)))))
 
 (defn -main [& _args]
   (charm/run {:init init

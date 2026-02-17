@@ -59,7 +59,7 @@
   (testing "short view shows bindings"
     (let [h (help/help [{:key "j/k" :desc "up/down"}
                         {:key "q" :desc "quit"}])
-          view (help/help-view h)]
+          view (help/short-help-view h)]
       (is (str/includes? view "j/k"))
       (is (str/includes? view "up/down"))
       (is (str/includes? view "q"))
@@ -69,19 +69,19 @@
     (let [h (help/help [{:key "a" :desc "one"}
                         {:key "b" :desc "two"}]
                        :separator " | ")
-          view (help/help-view h)]
+          view (help/short-help-view h)]
       (is (str/includes? view "|"))))
 
   (testing "full view is multi-line"
     (let [h (help/help [{:key "j/k" :desc "up/down"}
                         {:key "q" :desc "quit"}]
                        :show-all true)
-          view (help/help-view h)]
+          view (help/full-help-view h)]
       (is (str/includes? view "\n"))))
 
   (testing "empty bindings"
     (let [h (help/help [])
-          view (help/help-view h)]
+          view (help/short-help-view h)]
       (is (= "" view)))))
 
 (deftest help-update-test
