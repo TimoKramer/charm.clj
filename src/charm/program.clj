@@ -205,8 +205,6 @@
     (try
       ;; Setup renderer
       (render/start! renderer)
-      (when alt-screen
-        (render/enter-alt-screen! renderer))
 
       ;; Setup mouse
       (when mouse
