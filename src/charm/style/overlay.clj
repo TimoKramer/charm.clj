@@ -39,13 +39,13 @@
   [base-line overlay-line-str x]
   (let [base-attr (AttributedString/fromAnsi base-line)
         overlay-attr (AttributedString/fromAnsi overlay-line-str)
-        base-width (.columnLength base-attr)
-        overlay-width (.columnLength overlay-attr)
+        base-width (w/column-length base-attr)
+        overlay-width (w/column-length overlay-attr)
         builder (AttributedStringBuilder.)]
     ;; Part before overlay
     (when (pos? x)
       (let [before-width (min x base-width)]
-        (.append builder (.columnSubSequence base-attr 0 before-width))
+        (.append builder (w/column-sub-sequence base-attr 0 before-width))
         ;; Pad if base is shorter than x
         (when (< base-width x)
           (.append builder (apply str (repeat (- x base-width) " "))))))
@@ -54,7 +54,7 @@
     ;; Part after overlay
     (let [after-start (+ x overlay-width)]
       (when (< after-start base-width)
-        (.append builder (.columnSubSequence base-attr after-start base-width))))
+        (.append builder (w/column-sub-sequence base-attr after-start base-width))))
     (.toAnsi (.toAttributedString builder))))
 
 ;; ---------------------------------------------------------------------------

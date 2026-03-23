@@ -5,9 +5,16 @@
    - ANSI escape sequences (zero width)
    - Wide characters (CJK, emojis = 2 cells)
    - Combining characters (zero width)
-   - Grapheme clusters (emoji sequences)"
+   - Grapheme clusters (emoji sequences, via JLine 4 Mode 2027)"
   (:import
+   [org.jline.terminal Terminal]
    [org.jline.utils AttributedString]))
+
+(def ^:dynamic *terminal*
+  "Bound terminal for grapheme-cluster-aware width calculation.
+   When bound, JLine uses Mode 2027 grapheme clustering if the terminal
+   supports it. When nil, falls back to per-codepoint wcwidth."
+  nil)
 
 (defn strip-ansi
   "Remove ANSI escape sequences from a string."
@@ -16,12 +23,29 @@
     ""
     (.toString (AttributedString/fromAnsi s))))
 
+(defn column-length
+  "Get the display width of an AttributedString.
+   Uses grapheme clustering when *terminal* is bound and supports Mode 2027."
+  [^AttributedString attr-s]
+  (if *terminal*
+    (.columnLength attr-s ^Terminal *terminal*)
+    (.columnLength attr-s)))
+
+(defn column-sub-sequence
+  "Get a column-based subsequence of an AttributedString.
+   Uses grapheme clustering when *terminal* is bound and supports Mode 2027."
+  [^AttributedString attr-s start end]
+  (if *terminal*
+    (.columnSubSequence attr-s (int start) (int end) ^Terminal *terminal*)
+    (.columnSubSequence attr-s (int start) (int end))))
+
 (defn string-width
   "Measure the display width of a string in terminal cells.
 
    - ANSI escape sequences have zero width
    - Wide characters (CJK, emojis) count as 2 cells
    - Combining characters count as 0 cells
+   - Grapheme clusters (ZWJ emoji) count as 2 cells when *terminal* is bound
 
    Example:
      (string-width \"hello\")     ; => 5
@@ -30,7 +54,7 @@
   [s]
   (if (or (nil? s) (empty? s))
     0
-    (.columnLength (AttributedString/fromAnsi s))))
+    (column-length (AttributedString/fromAnsi s))))
 
 (defn truncate
   "Truncate a string to fit within a given display width.
@@ -47,13 +71,13 @@
   (if (nil? s)
     s
     (let [attr-s (AttributedString/fromAnsi s)]
-      (if (<= (.columnLength attr-s) width)
+      (if (<= (column-length attr-s) width)
         s
         (let [tail-width (string-width tail)
               target-width (- width tail-width)]
           (if (neg? target-width)
             ""
-            (str (.columnSubSequence attr-s 0 target-width) tail)))))))
+            (str (column-sub-sequence attr-s 0 target-width) tail)))))))
 
 (defn pad-right
   "Pad a string on the right to reach a target display width."
