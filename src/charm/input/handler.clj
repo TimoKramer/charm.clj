@@ -9,9 +9,10 @@
    [charm.input.mouse :as mouse]
    [clojure.string :as str])
   (:import
+   [java.io IOException]
    [org.jline.keymap KeyMap]
    [org.jline.terminal Terminal]
-   [org.jline.utils ClosedException NonBlockingReader]))
+   [org.jline.utils NonBlockingReader]))
 
 ;; ---------------------------------------------------------------------------
 ;; Input Reading
@@ -23,7 +24,7 @@
   [^NonBlockingReader reader ^long timeout-ms]
   (try
     (.read reader timeout-ms)
-    (catch ClosedException _ -1)))
+    (catch IOException _ -1)))
 
 (defn- read-char-blocking
   "Read a single character from the terminal, blocking."

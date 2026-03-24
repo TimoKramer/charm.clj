@@ -1,9 +1,9 @@
 {:paths ["src"]
  :deps {org.clojure/clojure {:mvn/version "1.12.4"}
         org.clojure/core.async {:mvn/version "1.8.741"}
-        org.jline/jline-terminal-ffm {:mvn/version "4.0.8"
+        org.jline/jline-terminal-ffm {:mvn/version "4.0.9"
                                       :exclusions [org.jline/jline-native]}
-        org.jline/jline-reader {:mvn/version "4.0.8"}}
+        org.jline/jline-reader {:mvn/version "4.0.9"}}
 
  :aliases
 
