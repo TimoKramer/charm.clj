@@ -63,7 +63,7 @@ Upgrade from JLine 3.30.6 to JLine 4.x and use its built-in Mode 2027 support.
 
 ### Threading the terminal
 
-JLine 4's grapheme-aware `columnLength(terminal)` and `columnSubSequence(start, end, terminal)` require a `Terminal` reference to check whether Mode 2027 is active. But width functions like `string-width` and `truncate` are called deep in the call stack—inside `view` functions, inside component rendering, inside layout helpers—where passing a terminal explicitly would thread it through every function signature.
+JLine 4's grapheme-aware `columnLength(terminal)` and `columnSubSequence(start, end, terminal)` require a `Terminal` reference to check whether Mode 2027 is active. But width functions like `string-width` and `truncate` are called deep in the call stack, inside `view` functions, inside component rendering, inside layout helpers, where passing a terminal explicitly would thread it through every function signature.
 
 We use a dynamic var `charm.ansi.width/*terminal*` to avoid this:
 
