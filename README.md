@@ -1,6 +1,7 @@
 # charm.clj
 
 ![Status](https://img.shields.io/badge/status-alpha-orange)
+[![Clojars Project](https://img.shields.io/clojars/v/de.timokramer/charm.clj.svg)](https://clojars.org/de.timokramer/charm.clj)
 
 A Clojure TUI (Terminal User Interface) library inspired by [Bubble Tea](https://github.com/charmbracelet/bubbletea).
 
@@ -40,15 +41,15 @@ issues. I am planning to use it for something more sophisticated. Please expect 
 
 Add to your `deps.edn`:
 
+via github
 ```clojure
-{:deps {charm.clj {:local/root "/path/to/charm.clj"}}}
+{:deps {io.github.timokramer/charm.clj {:git/tag "v0.1.64" :git/sha "e5120a9"}}}
+```
+or via clojars maven repository
+```clojure
+{:deps {de.timokramer/charm.clj {:mvn/version "0.1.64"}}}
 ```
 
-Or if published:
-
-```clojure
-{:deps {io.github.yourname/charm.clj {:git/tag "v0.1.0" :git/sha "..."}}}
-```
 
 ## Quick Start
 
