@@ -82,11 +82,20 @@ Or if published:
             :view    (fn [state] "string to render")
 
             ;; Options
-            :alt-screen false      ; Use alternate screen buffer
+            :alt-screen false      ; Use [alternate screen buffer](#alternate-screen-buffer)
             :mouse :cell           ; Mouse mode: nil, :normal, :cell, :all
             :focus-reporting false ; Report focus in/out events
             :fps 60})              ; Frames per second
 ```
+
+#### Alternate Screen Buffer
+
+Terminals have two screen buffers: the **normal buffer** (where your shell history lives) and the **alternate buffer** (a separate, clean screen).
+
+When you set `:alt-screen true`, your program switches to the alternate buffer on startup and switches back when it exits. This is the same mechanism used by `vim`, `less`, and `htop` — your previous terminal content disappears while the program runs and reappears when it quits, as if nothing happened.
+
+Use `:alt-screen true` for full-screen applications like file browsers, editors, or dashboards. Leave it `false` (the default) for inline programs like prompts or spinners that should leave their output visible in the scrollback after they finish.
+
 
 ### Messages
 
@@ -160,53 +169,9 @@ charm/quit-cmd
 (charm/join-vertical :center block1 block2)
 ```
 
-## Example: Counter App
+## Examples
 
-```clojure
-(ns counter.core
-  (:require [charm.core :as charm]))
-
-(def title-style
-  (charm/style :fg charm/magenta :bold true))
-
-(def count-style
-  (charm/style :fg charm/cyan
-               :padding [0 1]
-               :border charm/rounded-border))
-
-(defn update-fn [state msg]
-  (cond
-    ;; Quit on q or Ctrl+C
-    (or (charm/key-match? msg "q")
-        (charm/key-match? msg "ctrl+c"))
-    [state charm/quit-cmd]
-
-    ;; Increment on k or up arrow
-    (or (charm/key-match? msg "k")
-        (charm/key-match? msg :up))
-    [(update state :count inc) nil]
-
-    ;; Decrement on j or down arrow
-    (or (charm/key-match? msg "j")
-        (charm/key-match? msg :down))
-    [(update state :count dec) nil]
-
-    ;; Ignore other messages
-    :else
-    [state nil]))
-
-(defn view [state]
-  (str (charm/render title-style "Counter App") "\n\n"
-       (charm/render count-style (str (:count state))) "\n\n"
-       "j/k or arrows to change\n"
-       "q to quit"))
-
-(defn -main [& args]
-  (charm/run {:init {:count 0}
-              :update update-fn
-              :view view
-              :alt-screen true}))
-```
+Please take a look at the [examples](docs/examples/README.md) in the docs folder and don't hesitate to contribute your examples please.
 
 ## Project Structure
 
