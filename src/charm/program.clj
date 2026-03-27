@@ -222,6 +222,11 @@
                           (run [_]
                             (check-window-size! terminal msg-chan last-size))))
 
+      (Signals/register "INT"
+                        (reify Runnable
+                          (run [_]
+                            (a/put! msg-chan (msg/key-press "c" :ctrl true)))))
+
       ;; Check initial window size
       (check-window-size! terminal msg-chan last-size)
 
@@ -240,7 +245,7 @@
         ;; Main event loop
         (loop []
           (when @running?
-            (when-let [m (a/<!! (a/timeout 10))]
+            (when-let [_ (a/<!! (a/timeout 10))]
              ;; Timeout - just continue
               nil)
 
