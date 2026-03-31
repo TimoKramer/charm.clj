@@ -3,7 +3,9 @@
 
    Shows that ZWJ sequences, flags, and skin-tone emoji are measured correctly
    when JLine 4 Mode 2027 is active (see ADR 006)."
-  (:require [charm.core :as charm]))
+  (:require
+   [charm.core :as charm]
+   [charm.ansi.width :as w]))
 
 ;; ---------------------------------------------------------------------------
 ;; Data
@@ -54,12 +56,16 @@
 
 (defn init []
   (let [tbl (charm/table [{:title "Emoji" :width 6}
-                           {:title "Name" :width 22}
-                           {:title "Type" :width 34}]
-                          emoji-rows
-                          :cursor 0
-                          :header-style header-style
-                          :cursor-style cursor-style)]
+                          {:title "Name" :width 22}
+                          {:title "Type" :width 34}
+                          {:title "Expect" :width 6}
+                          {:title "Actual" :width 6}]
+                         (mapv (fn [[emoji name desc]]
+                                 [emoji name desc "2" "-"])
+                               emoji-rows)
+                         :cursor 0
+                         :header-style header-style
+                         :cursor-style cursor-style)]
     [tbl nil]))
 
 (defn update-fn [tbl msg]
@@ -72,11 +78,15 @@
     (charm/table-update tbl msg)))
 
 (defn view [tbl]
-  (str (charm/render title-style "Grapheme Cluster Width Demo") "\n"
-       (charm/render subtitle-style "Emoji should align neatly if Mode 2027 is active") "\n\n"
-       (charm/render box-style (charm/table-view tbl {:separator " │ "}))
-       "\n\n"
-       "j/k navigate  q quit"))
+  (let [rows (mapv (fn [[emoji name desc]]
+                     [emoji name desc "2" (str (w/string-width emoji))])
+                   emoji-rows)
+        tbl (assoc tbl :rows rows)]
+    (str (charm/render title-style "Grapheme Cluster Width Demo") "\n"
+         (charm/render subtitle-style "Emoji should align neatly if Mode 2027 is active") "\n\n"
+         (charm/render box-style (charm/table-view tbl {:separator " │ "}))
+         "\n\n"
+         "j/k navigate  q quit")))
 
 ;; ---------------------------------------------------------------------------
 ;; Main
