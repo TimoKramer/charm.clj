@@ -1,31 +1,36 @@
 (ns examples.todos
   "Full todo application demonstrating component composition:
    list + text-input + help working together."
-  (:require [charm.core :as charm]
-            [charm.components.help :as help]
-            [clojure.string :as str]))
+  (:require
+   [charm.components.help :as help]
+   [charm.components.list :as item-list]
+   [charm.components.text-input :as text-input]
+   [charm.message :as msg]
+   [charm.program :as program]
+   [charm.style.core :as style]
+   [clojure.string :as str]))
 
 (def title-style
-  (charm/style :fg charm/magenta :bold true))
+  (style/style :fg style/magenta :bold true))
 
 (def input-style
-  (charm/style :fg charm/cyan))
+  (style/style :fg style/cyan))
 
 (def done-style
-  (charm/style :fg 240 :strikethrough true))
+  (style/style :fg 240 :strikethrough true))
 
 (def pending-style
-  (charm/style :fg charm/white))
+  (style/style :fg style/white))
 
 (def count-style
-  (charm/style :fg charm/yellow))
+  (style/style :fg style/yellow))
 
 (def hint-style
-  (charm/style :fg 240))
+  (style/style :fg 240))
 
 ;; Help bindings
 (def help-bindings
-  (charm/help-from-pairs
+  (help/from-pairs
    "j/k" "up/down"
    "a" "add todo"
    "x" "toggle done"
@@ -53,7 +58,7 @@
   [state]
   (let [todos (:todos state)
         items (mapv todo->list-item todos)]
-    (assoc state :todo-list (charm/list-set-items (:todo-list state) items))))
+    (assoc state :todo-list (item-list/set-items (:todo-list state) items))))
 
 (defn init []
   (let [initial-todos [(make-todo "Learn charm.clj")
@@ -61,15 +66,15 @@
                        (make-todo "Have fun!")]
         items (mapv todo->list-item initial-todos)]
     [{:todos initial-todos
-      :todo-list (charm/item-list items
-                                  :height 10
-                                  :cursor-prefix "> "
-                                  :item-prefix "  ")
-      :input (charm/text-input :prompt "New todo: "
-                               :placeholder "What needs to be done?"
-                               :focused false)
+      :todo-list (item-list/item-list items
+                                      :height 10
+                                      :cursor-prefix "> "
+                                      :item-prefix "  ")
+      :input (text-input/text-input :prompt "New todo: "
+                                    :placeholder "What needs to be done?"
+                                    :focused false)
       :mode :browse  ; :browse or :add
-      :help (charm/help help-bindings :width 60)}
+      :help (help/help help-bindings :width 60)}
      nil]))
 
 (defn enter-add-mode
@@ -77,20 +82,20 @@
   [state]
   (-> state
       (assoc :mode :add)
-      (update :input charm/text-input-focus)))
+      (update :input text-input/focus)))
 
 (defn exit-add-mode
   "Switch back to browse mode."
   [state]
   (-> state
       (assoc :mode :browse)
-      (update :input charm/text-input-blur)
-      (update :input charm/text-input-reset)))
+      (update :input text-input/blur)
+      (update :input text-input/reset)))
 
 (defn add-todo
   "Add new todo from input."
   [state]
-  (let [text (str/trim (charm/text-input-value (:input state)))]
+  (let [text (str/trim (text-input/value (:input state)))]
     (if (str/blank? text)
       (exit-add-mode state)
       (-> state
@@ -101,7 +106,7 @@
 (defn toggle-selected
   "Toggle done state of selected todo."
   [state]
-  (let [idx (charm/list-selected-index (:todo-list state))]
+  (let [idx (item-list/selected-index (:todo-list state))]
     (if (and idx (< idx (count (:todos state))))
       (-> state
           (update-in [:todos idx :done] not)
@@ -111,7 +116,7 @@
 (defn delete-selected
   "Delete the selected todo."
   [state]
-  (let [idx (charm/list-selected-index (:todo-list state))]
+  (let [idx (item-list/selected-index (:todo-list state))]
     (if (and idx (< idx (count (:todos state))))
       (-> state
           (update :todos (fn [todos]
@@ -123,51 +128,51 @@
 (defn update-fn [state msg]
   (cond
     ;; Quit (only in browse mode, or ctrl+c/esc always)
-    (or (charm/key-match? msg "ctrl+c")
+    (or (msg/key-match? msg "ctrl+c")
         (and (= (:mode state) :browse)
-             (charm/key-match? msg "q")))
-    [state charm/quit-cmd]
+             (msg/key-match? msg "q")))
+    [state program/quit-cmd]
 
     ;; Escape always exits add mode or quits in browse mode
-    (charm/key-match? msg "esc")
+    (msg/key-match? msg "esc")
     (if (= (:mode state) :add)
       [(exit-add-mode state) nil]
-      [state charm/quit-cmd])
+      [state program/quit-cmd])
 
     ;; In add mode
     (= (:mode state) :add)
     (cond
       ;; Enter to submit
-      (charm/key-match? msg "enter")
+      (msg/key-match? msg "enter")
       [(add-todo state) nil]
 
       ;; Pass to text input
       :else
-      (let [[new-input cmd] (charm/text-input-update (:input state) msg)]
+      (let [[new-input cmd] (text-input/text-input-update (:input state) msg)]
         [(assoc state :input new-input) cmd]))
 
     ;; In browse mode
     :else
     (cond
       ;; A to add new todo
-      (charm/key-match? msg "a")
+      (msg/key-match? msg "a")
       [(enter-add-mode state) nil]
 
       ;; X to toggle done
-      (charm/key-match? msg "x")
+      (msg/key-match? msg "x")
       [(toggle-selected state) nil]
 
       ;; D to delete
-      (charm/key-match? msg "d")
+      (msg/key-match? msg "d")
       [(delete-selected state) nil]
 
       ;; ? to toggle help
-      (charm/key-match? msg "?")
-      [(update state :help charm/help-toggle-show-all) nil]
+      (msg/key-match? msg "?")
+      [(update state :help help/toggle-show-all) nil]
 
       ;; Pass navigation to list
       :else
-      (let [[new-list cmd] (charm/list-update (:todo-list state) msg)]
+      (let [[new-list cmd] (item-list/list-update (:todo-list state) msg)]
         [(assoc state :todo-list new-list) cmd]))))
 
 (defn count-todos
@@ -181,8 +186,8 @@
   (let [{:keys [todos todo-list input mode help]} state
         counts (count-todos todos)
         show-full-help? (:show-all help)]
-    (str (charm/render title-style "Todo List") "\n"
-         (charm/render count-style
+    (str (style/render title-style "Todo List") "\n"
+         (style/render count-style
                        (format "%d pending, %d done"
                                (:pending counts)
                                (:done counts)))
@@ -190,23 +195,23 @@
 
          ;; Todo list
          (if (empty? todos)
-           (charm/render hint-style "No todos yet. Press 'a' to add one!")
-           (charm/list-view todo-list))
+           (style/render hint-style "No todos yet. Press 'a' to add one!")
+           (item-list/list-view todo-list))
          "\n\n"
 
          ;; Input (visible in add mode)
          (when (= mode :add)
-           (str (charm/text-input-view input) "\n\n"))
+           (str (text-input/text-input-view input) "\n\n"))
 
          ;; Help
          (if show-full-help?
-           (str (charm/render (charm/style :bold true) "Keyboard Shortcuts") "\n"
+           (str (style/render (style/style :bold true) "Keyboard Shortcuts") "\n"
                 (help/full-help-view help) "\n\n"
-                (charm/render hint-style "Press ? to hide help"))
+                (style/render hint-style "Press ? to hide help"))
            (help/short-help-view help)))))
 
 (defn -main [& _args]
-  (charm/run {:init init
-              :update update-fn
-              :view view
-              :alt-screen true}))
+  (program/run {:init init
+                :update update-fn
+                :view view
+                :alt-screen true}))

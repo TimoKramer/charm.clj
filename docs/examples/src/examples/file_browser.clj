@@ -1,20 +1,22 @@
 (ns examples.file-browser
   "File browser demonstrating list component with a details pane."
   (:require
-    [charm.ansi.width :as w]
-    [charm.components.help :as help]
-    [charm.core :as charm]
-    [charm.style.border :as border]
-    [charm.style.core :as style]
-    [clojure.java.io :as io]
-    [clojure.string :as str])
+   [charm.ansi.width :as w]
+   [charm.components.help :as help]
+   [charm.components.list :as item-list]
+   [charm.message :as msg]
+   [charm.program :as program]
+   [charm.style.border :as border]
+   [charm.style.core :as style]
+   [clojure.java.io :as io]
+   [clojure.string :as str])
   (:import
-    [java.io File]
-    [java.text SimpleDateFormat]
-    [java.util Date]))
+   [java.io File]
+   [java.text SimpleDateFormat]
+   [java.util Date]))
 
 (def title-style
-  (style/style :fg charm/magenta :bold true))
+  (style/style :fg style/magenta :bold true))
 
 (def path-style
   (style/style :fg 240))
@@ -23,10 +25,10 @@
   (style/style :fg 240))
 
 (def detail-value-style
-  (style/style :fg charm/cyan))
+  (style/style :fg style/cyan))
 
 (def help-bindings
-  (charm/help-from-pairs
+  (help/from-pairs
    "j/k" "navigate"
    "Enter/l" "open"
    "Backspace/h" "back"
@@ -93,11 +95,11 @@
   (max 3 (quot (- term-height chrome-height) 2)))
 
 (defn- make-file-list [items term-width term-height]
-  (charm/item-list items
-                   :height (list-height term-height)
-                   :width (list-width term-width)
-                   :show-descriptions true
-                   :cursor-style (charm/style :fg charm/cyan :bold true)))
+  (item-list/item-list items
+                       :height (list-height term-height)
+                       :width (list-width term-width)
+                       :show-descriptions true
+                       :cursor-style (style/style :fg style/cyan :bold true)))
 
 (defn init []
   (let [start-path (System/getProperty "user.dir")
@@ -109,7 +111,7 @@
       :term-width 80
       :term-height 24
       :file-list (make-file-list items 80 24)
-      :help (charm/help help-bindings :width 60)}
+      :help (help/help help-bindings :width 60)}
      nil]))
 
 (defn navigate-to
@@ -136,7 +138,7 @@
 (defn enter-selected
   "Enter selected directory or do nothing for files."
   [state]
-  (let [selected (charm/list-selected-item (:file-list state))]
+  (let [selected (item-list/selected-item (:file-list state))]
     (when-let [info (:data selected)]
       (if (:directory? info)
         (navigate-to state (:path info))
@@ -145,13 +147,13 @@
 (defn update-fn [state msg]
   (cond
     ;; Quit
-    (or (charm/key-match? msg "q")
-        (charm/key-match? msg "ctrl+c")
-        (charm/key-match? msg "esc"))
-    [state charm/quit-cmd]
+    (or (msg/key-match? msg "q")
+        (msg/key-match? msg "ctrl+c")
+        (msg/key-match? msg "esc"))
+    [state program/quit-cmd]
 
     ;; Window resize
-    (charm/window-size? msg)
+    (msg/window-size? msg)
     (let [w (:width msg)
           h (:height msg)]
       [(assoc state
@@ -161,26 +163,26 @@
        nil])
 
     ;; Go up directory
-    (or (charm/key-match? msg "backspace")
-        (charm/key-match? msg "h")
-        (charm/key-match? msg :left))
+    (or (msg/key-match? msg "backspace")
+        (msg/key-match? msg "h")
+        (msg/key-match? msg :left))
     [(go-up state) nil]
 
     ;; Enter directory
-    (or (charm/key-match? msg "enter")
-        (charm/key-match? msg "l")
-        (charm/key-match? msg :right))
+    (or (msg/key-match? msg "enter")
+        (msg/key-match? msg "l")
+        (msg/key-match? msg :right))
     [(or (enter-selected state) state) nil]
 
     ;; Pass to list for navigation
     :else
-    (let [[new-list cmd] (charm/list-update (:file-list state) msg)]
+    (let [[new-list cmd] (item-list/list-update (:file-list state) msg)]
       [(assoc state :file-list new-list) cmd])))
 
 (defn render-details
   "Render the details pane for selected file."
   [state]
-  (if-let [selected (charm/list-selected-item (:file-list state))]
+  (if-let [selected (item-list/selected-item (:file-list state))]
     (let [info (:data selected)]
       (str (style/render detail-label-style "Name     ")
            (style/render detail-value-style (:name info)) "\n"
@@ -209,7 +211,7 @@
     (str/join "\n" (map render-row (range height)))))
 
 (defn view [state]
-  (let [file-list-view (charm/list-view (:file-list state))
+  (let [file-list-view (item-list/list-view (:file-list state))
         details-view (render-details state)
         details-style (style/style :border border/rounded
                                    :border-fg 240
@@ -227,7 +229,7 @@
          (help/short-help-view (:help state)))))
 
 (defn -main [& _args]
-  (charm/run {:init init
-              :update update-fn
-              :view view
-              :alt-screen true}))
+  (program/run {:init init
+                :update update-fn
+                :view view
+                :alt-screen true}))

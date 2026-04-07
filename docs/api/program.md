@@ -7,7 +7,7 @@ The program module provides the main event loop and command system for TUI appli
 ### run
 
 ```clojure
-(charm/run options)
+(program/run options)
 ```
 
 Run a TUI program with the Elm Architecture pattern.
@@ -28,12 +28,12 @@ Run a TUI program with the Elm Architecture pattern.
 **Example:**
 
 ```clojure
-(charm/run
+(program/run
   {:init {:count 0}
    :update (fn [state msg]
              (cond
-               (charm/key-match? msg "q") [state charm/quit-cmd]
-               (charm/key-match? msg "up") [(update state :count inc) nil]
+               (msg/key-match? msg "q") [state program/quit-cmd]
+               (msg/key-match? msg "up") [(update state :count inc) nil]
                :else [state nil]))
    :view (fn [state]
            (str "Count: " (:count state) "\nPress q to quit"))
@@ -43,7 +43,7 @@ Run a TUI program with the Elm Architecture pattern.
 ### run-async
 
 ```clojure
-(charm/run-async options)
+(program/run-async options)
 ```
 
 Run a TUI program in the background. Accepts the same options as `run` but returns immediately with a handle instead of blocking. Mainly for testing in the REPL.
@@ -59,10 +59,10 @@ Run a TUI program in the background. Accepts the same options as `run` but retur
 
 ```clojure
 ;; Start the app in the background
-(def app (charm/run-async {:init init
-                           :update update-fn
-                           :view view
-                           :alt-screen true}))
+(def app (program/run-async {:init init
+                             :update update-fn
+                             :view view
+                             :alt-screen true}))
 
 ;; Stop it from another thread / REPL
 ((:quit! app))
@@ -78,60 +78,60 @@ Commands are asynchronous operations that produce messages. They're returned fro
 ### cmd
 
 ```clojure
-(charm/cmd f)
+(program/cmd f)
 ```
 
 Create a command from a function that returns a message.
 
 ```clojure
 ;; Command that sends a message after 1 second
-(charm/cmd (fn []
-             (Thread/sleep 1000)
-             {:type :timer-done}))
+(program/cmd (fn []
+               (Thread/sleep 1000)
+               {:type :timer-done}))
 ```
 
 ### batch
 
 ```clojure
-(charm/batch & cmds)
+(program/batch & cmds)
 ```
 
 Combine multiple commands into one. All commands run in parallel.
 
 ```clojure
-(charm/batch
-  (charm/cmd #(do-thing-1))
-  (charm/cmd #(do-thing-2))
-  (charm/cmd #(do-thing-3)))
+(program/batch
+  (program/cmd #(do-thing-1))
+  (program/cmd #(do-thing-2))
+  (program/cmd #(do-thing-3)))
 ```
 
 ### sequence-cmds
 
 ```clojure
-(charm/sequence-cmds & cmds)
+(program/sequence-cmds & cmds)
 ```
 
 Run commands in sequence (each waits for the previous to complete).
 
 ```clojure
-(charm/sequence-cmds
-  (charm/cmd #(step-1))
-  (charm/cmd #(step-2))
-  (charm/cmd #(step-3)))
+(program/sequence-cmds
+  (program/cmd #(step-1))
+  (program/cmd #(step-2))
+  (program/cmd #(step-3)))
 ```
 
 ### quit-cmd
 
 ```clojure
-charm/quit-cmd
+program/quit-cmd
 ```
 
 A pre-built command that exits the program.
 
 ```clojure
 (defn update-fn [state msg]
-  (if (charm/key-match? msg "q")
-    [state charm/quit-cmd]
+  (if (msg/key-match? msg "q")
+    [state program/quit-cmd]
     [state nil]))
 ```
 
@@ -149,8 +149,8 @@ The `init` option can be:
 
 ```clojure
 {:init (fn []
-         (let [[timer cmd] (charm/timer-init (charm/timer :timeout 5000))]
-           [{:timer timer} cmd]))}
+         (let [[t cmd] (timer/timer-init (timer/timer :timeout 5000))]
+           [{:timer t} cmd]))}
 ```
 
 3. **A function** returning just `state`
@@ -167,11 +167,11 @@ The update function receives the current state and a message, returning `[new-st
 (defn update-fn [state msg]
   (cond
     ;; Handle quit
-    (charm/key-match? msg "q")
-    [state charm/quit-cmd]
+    (msg/key-match? msg "q")
+    [state program/quit-cmd]
 
     ;; Handle key press
-    (charm/key-match? msg "up")
+    (msg/key-match? msg "up")
     [(update state :count inc) nil]
 
     ;; Handle custom message
@@ -203,10 +203,10 @@ The view function receives state and returns a string to display.
 | `:all` | All mouse events including motion |
 
 ```clojure
-(charm/run {:init init
-            :update update-fn
-            :view view
-            :mouse :normal})
+(program/run {:init init
+              :update update-fn
+              :view view
+              :mouse :normal})
 ```
 
 ## Focus Reporting
@@ -214,31 +214,38 @@ The view function receives state and returns a string to display.
 When enabled, focus events are sent when the terminal gains/loses focus.
 
 ```clojure
-(charm/run {:init init
-            :update update-fn
-            :view view
-            :focus-reporting true})
+(program/run {:init init
+              :update update-fn
+              :view view
+              :focus-reporting true})
 
 ;; In update function
 (defn update-fn [state msg]
   (cond
-    (charm/focus? msg) [(assoc state :focused true) nil]
-    (charm/blur? msg) [(assoc state :focused false) nil]
-    :else [state nil]))
+    (msg/focus? msg)
+    [(assoc state :focused true) nil]
+
+    (msg/blur? msg)
+    [(assoc state :focused false) nil]
+
+    :else
+    [state nil]))
 ```
 
 ## Complete Example
 
 ```clojure
 (ns my-app
-  (:require [charm.core :as charm]))
+  (:require
+   [charm.message :as msg]
+   [charm.program :as program]))
 
 (defn fetch-data-cmd []
-  (charm/cmd (fn []
-               ;; Simulate async data fetch
-               (Thread/sleep 1000)
-               {:type :data-loaded
-                :data ["Item 1" "Item 2" "Item 3"]})))
+  (program/cmd (fn []
+                 ;; Simulate async data fetch
+                 (Thread/sleep 1000)
+                 {:type :data-loaded
+                  :data ["Item 1" "Item 2" "Item 3"]})))
 
 (defn init []
   [{:loading true :data nil}
@@ -246,8 +253,8 @@ When enabled, focus events are sent when the terminal gains/loses focus.
 
 (defn update-fn [state msg]
   (cond
-    (charm/key-match? msg "q")
-    [state charm/quit-cmd]
+    (msg/key-match? msg "q")
+    [state program/quit-cmd]
 
     (= :data-loaded (:type msg))
     [(assoc state :loading false :data (:data msg)) nil]
@@ -262,8 +269,8 @@ When enabled, focus events are sent when the terminal gains/loses focus.
          "\n\nPress q to quit")))
 
 (defn -main [& _args]
-  (charm/run {:init init
-              :update update-fn
-              :view view
-              :alt-screen true}))
+  (program/run {:init init
+                :update update-fn
+                :view view
+                :alt-screen true}))
 ```

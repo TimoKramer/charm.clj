@@ -5,24 +5,24 @@ Text entry component with cursor movement, editing, and multiple echo modes.
 ## Quick Example
 
 ```clojure
-(require '[charm.core :as charm])
+(require '[charm.components.text-input :as text-input])
 
-(def my-input (charm/text-input :prompt "Name: "
-                                :placeholder "Enter your name"))
+(def my-input (text-input/text-input :prompt "Name: "
+                                     :placeholder "Enter your name"))
 
 ;; In update function
-(let [[input cmd] (charm/text-input-update my-input msg)]
+(let [[input cmd] (text-input/text-input-update my-input msg)]
   ;; Handle key presses
   )
 
 ;; In view function
-(charm/text-input-view my-input)  ; => "Name: |Enter your name"
+(text-input/text-input-view my-input)  ; => "Name: |Enter your name"
 ```
 
 ## Creation Options
 
 ```clojure
-(charm/text-input & options)
+(text-input/text-input & options)
 ```
 
 | Option | Type | Default | Description |
@@ -45,14 +45,14 @@ Text entry component with cursor movement, editing, and multiple echo modes.
 
 ```clojure
 ;; Normal - shows typed text
-(charm/text-input :echo-mode charm/echo-normal)
+(text-input/text-input :echo-mode text-input/echo-normal)
 
 ;; Password - shows asterisks
-(charm/text-input :echo-mode charm/echo-password)
-(charm/text-input :echo-mode charm/echo-password :echo-char \●)
+(text-input/text-input :echo-mode text-input/echo-password)
+(text-input/text-input :echo-mode text-input/echo-password :echo-char \●)
 
 ;; None - hides all input
-(charm/text-input :echo-mode charm/echo-none)
+(text-input/text-input :echo-mode text-input/echo-none)
 ```
 
 ## Key Bindings
@@ -77,7 +77,7 @@ Text entry component with cursor movement, editing, and multiple echo modes.
 ### text-input-update
 
 ```clojure
-(charm/text-input-update input msg) ; => [input cmd]
+(text-input/text-input-update input msg) ; => [input cmd]
 ```
 
 Handle key messages. Only processes input when focused.
@@ -85,36 +85,36 @@ Handle key messages. Only processes input when focused.
 ### text-input-view
 
 ```clojure
-(charm/text-input-view input) ; => "Name: John|"
+(text-input/text-input-view input) ; => "Name: John|"
 ```
 
 Render the input with prompt and cursor.
 
-### text-input-value
+### value
 
 ```clojure
-(charm/text-input-value input) ; => "John"
+(text-input/value input) ; => "John"
 ```
 
 Get current value as a string.
 
-### text-input-focus / text-input-blur
+### focus / blur
 
 ```clojure
-(charm/text-input-focus input)  ; Focus the input
-(charm/text-input-blur input)   ; Unfocus the input
+(text-input/focus input)  ; Focus the input
+(text-input/blur input)   ; Unfocus the input
 ```
 
-### text-input-reset
+### reset
 
 ```clojure
-(charm/text-input-reset input)  ; Clear the value
+(text-input/reset input)  ; Clear the value
 ```
 
-### text-input-set-value
+### set-value
 
 ```clojure
-(charm/text-input-set-value input "new value")
+(text-input/set-value input "new value")
 ```
 
 Set the value and move cursor to end.
@@ -123,43 +123,46 @@ Set the value and move cursor to end.
 
 ```clojure
 (ns my-app
-  (:require [charm.core :as charm]))
+  (:require
+   [charm.components.text-input :as text-input]
+   [charm.message :as msg]
+   [charm.program :as program]))
 
 (defn init []
-  [{:username (charm/text-input :prompt "Username: " :focused true)
-    :password (charm/text-input :prompt "Password: "
-                                :echo-mode charm/echo-password
-                                :focused false)
+  [{:username (text-input/text-input :prompt "Username: " :focused true)
+    :password (text-input/text-input :prompt "Password: "
+                                     :echo-mode text-input/echo-password
+                                     :focused false)
     :current :username}
    nil])
 
 (defn update-fn [state msg]
   (cond
-    (charm/key-match? msg "tab")
+    (msg/key-match? msg "tab")
     (let [next-field (if (= :username (:current state)) :password :username)]
       [(-> state
            (update :username (if (= next-field :username)
-                               charm/text-input-focus
-                               charm/text-input-blur))
+                               text-input/focus
+                               text-input/blur))
            (update :password (if (= next-field :password)
-                               charm/text-input-focus
-                               charm/text-input-blur))
+                               text-input/focus
+                               text-input/blur))
            (assoc :current next-field))
        nil])
 
-    (charm/key-match? msg "enter")
+    (msg/key-match? msg "enter")
     ;; Submit form
-    [state charm/quit-cmd]
+    [state program/quit-cmd]
 
     :else
     (let [field (:current state)
-          [input cmd] (charm/text-input-update (get state field) msg)]
+          [input cmd] (text-input/text-input-update (get state field) msg)]
       [(assoc state field input) cmd])))
 
 (defn view [state]
-  (str (charm/text-input-view (:username state)) "\n"
-       (charm/text-input-view (:password state)) "\n\n"
+  (str (text-input/text-input-view (:username state)) "\n"
+       (text-input/text-input-view (:password state)) "\n\n"
        "Tab to switch fields, Enter to submit"))
 
-(charm/run {:init init :update update-fn :view view})
+(program/run {:init init :update update-fn :view view})
 ```
