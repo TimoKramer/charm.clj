@@ -5,17 +5,17 @@ Scrollable list component with keyboard navigation and item selection.
 ## Quick Example
 
 ```clojure
-(require '[charm.core :as charm])
+(require '[charm.components.list :as item-list])
 
-(def my-list (charm/item-list ["Apple" "Banana" "Cherry"]))
+(def my-list (item-list/item-list ["Apple" "Banana" "Cherry"]))
 
 ;; In update function
-(let [[list cmd] (charm/list-update my-list msg)]
+(let [[list cmd] (item-list/list-update my-list msg)]
   ;; Handle navigation
   )
 
 ;; In view function
-(charm/list-view my-list)
+(item-list/list-view my-list)
 ;; > Apple
 ;;   Banana
 ;;   Cherry
@@ -24,7 +24,7 @@ Scrollable list component with keyboard navigation and item selection.
 ## Creation Options
 
 ```clojure
-(charm/item-list items & options)
+(item-list/item-list items & options)
 ```
 
 | Option | Type | Default | Description |
@@ -50,16 +50,16 @@ Items can be strings or maps:
 
 ```clojure
 ;; Simple strings
-(charm/item-list ["Apple" "Banana" "Cherry"])
+(item-list/item-list ["Apple" "Banana" "Cherry"])
 
 ;; Maps with title and description
-(charm/item-list [{:title "Apple" :description "A red fruit"}
-                  {:title "Banana" :description "A yellow fruit"}]
-                 :show-descriptions true)
+(item-list/item-list [{:title "Apple" :description "A red fruit"}
+                      {:title "Banana" :description "A yellow fruit"}]
+                     :show-descriptions true)
 
 ;; Maps with custom keys
-(charm/item-list [{:name "Alice" :role "Admin"}
-                  {:name "Bob" :role "User"}])
+(item-list/item-list [{:name "Alice" :role "Admin"}
+                      {:name "Bob" :role "User"}])
 ;; Uses :name as title, :role as description
 ```
 
@@ -79,7 +79,7 @@ Items can be strings or maps:
 ### list-update
 
 ```clojure
-(charm/list-update list msg) ; => [list cmd]
+(item-list/list-update list msg) ; => [list cmd]
 ```
 
 Handle navigation messages.
@@ -87,57 +87,61 @@ Handle navigation messages.
 ### list-view
 
 ```clojure
-(charm/list-view list) ; => "> Apple\n  Banana\n  Cherry"
+(item-list/list-view list) ; => "> Apple\n  Banana\n  Cherry"
 ```
 
 Render the list as a string.
 
-### list-selected-item
+### selected-item
 
 ```clojure
-(charm/list-selected-item list) ; => "Apple" or {:title "Apple" ...}
+(item-list/selected-item list) ; => "Apple" or {:title "Apple" ...}
 ```
 
 Get the currently selected item.
 
-### list-selected-index
+### selected-index
 
 ```clojure
-(charm/list-selected-index list) ; => 0
+(item-list/selected-index list) ; => 0
 ```
 
 Get the index of the selected item.
 
-### list-set-items
+### set-items
 
 ```clojure
-(charm/list-set-items list new-items)
+(item-list/set-items list new-items)
 ```
 
 Replace all items, adjusting cursor if needed.
 
-### list-select
+### select
 
 ```clojure
-(charm/list-select list 2)  ; Select item at index 2
+(item-list/select list 2)  ; Select item at index 2
 ```
 
 ### Navigation Functions
 
 ```clojure
-(charm/list-cursor-up list)
-(charm/list-cursor-down list)
-(charm/list-page-up list)
-(charm/list-page-down list)
-(charm/list-go-to-start list)
-(charm/list-go-to-end list)
+(item-list/cursor-up list)
+(item-list/cursor-down list)
+(item-list/page-up list)
+(item-list/page-down list)
+(item-list/go-to-start list)
+(item-list/go-to-end list)
 ```
 
 ## Full Example
 
 ```clojure
 (ns my-app
-  (:require [charm.core :as charm]))
+  (:require
+   [charm.components.list :as item-list]
+   [charm.message :as msg]
+   [charm.program :as program]
+   [charm.style.core :as style]))
 
 (def items
   [{:title "New File" :description "Create a new file"}
@@ -146,34 +150,34 @@ Replace all items, adjusting cursor if needed.
    {:title "Exit" :description "Quit the application"}])
 
 (defn init []
-  [{:menu (charm/item-list items
-                           :height 10
-                           :show-descriptions true
-                           :cursor-style (charm/style :fg charm/yellow :bold true))}
+  [{:menu (item-list/item-list items
+                               :height 10
+                               :show-descriptions true
+                               :cursor-style (style/style :fg style/yellow :bold true))}
    nil])
 
 (defn update-fn [state msg]
   (cond
-    (charm/key-match? msg "enter")
-    (let [selected (charm/list-selected-item (:menu state))]
+    (msg/key-match? msg "enter")
+    (let [selected (item-list/selected-item (:menu state))]
       (println "Selected:" (:title selected))
       (if (= "Exit" (:title selected))
-        [state charm/quit-cmd]
+        [state program/quit-cmd]
         [state nil]))
 
-    (charm/key-match? msg "q")
-    [state charm/quit-cmd]
+    (msg/key-match? msg "q")
+    [state program/quit-cmd]
 
     :else
-    (let [[menu cmd] (charm/list-update (:menu state) msg)]
+    (let [[menu cmd] (item-list/list-update (:menu state) msg)]
       [(assoc state :menu menu) cmd])))
 
 (defn view [state]
   (str "Select an option:\n\n"
-       (charm/list-view (:menu state))
+       (item-list/list-view (:menu state))
        "\n\nEnter to select, q to quit"))
 
-(charm/run {:init init :update update-fn :view view})
+(program/run {:init init :update update-fn :view view})
 ```
 
 ## Scrolling
@@ -181,16 +185,16 @@ Replace all items, adjusting cursor if needed.
 When `:height` is set, the list scrolls to keep the cursor visible:
 
 ```clojure
-(charm/item-list (range 100)
-                 :height 10)  ; Shows 10 items, scrolls with cursor
+(item-list/item-list (range 100)
+                     :height 10)  ; Shows 10 items, scrolls with cursor
 ```
 
 ## Filtering
 
 ```clojure
 ;; Filter items by predicate
-(charm/list-filter-items list #(str/includes? (:title %) "search"))
+(item-list/filter-items list #(str/includes? (:title %) "search"))
 
 ;; Find and select first match
-(charm/list-select-first-match list #(= "target" (:title %)))
+(item-list/select-first-match list #(= "target" (:title %)))
 ```

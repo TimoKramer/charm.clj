@@ -55,22 +55,25 @@ or via clojars maven repository
 
 ```clojure
 (ns myapp.core
-  (:require [charm.core :as charm]))
+  (:require
+   [charm.message :as msg]
+   [charm.program :as program]
+   [charm.style.core :as style]))
 
 (defn update-fn [state msg]
   (cond
-    (charm/key-match? msg "q") [state charm/quit-cmd]
-    (charm/key-match? msg "k") [(update state :count inc) nil]
-    (charm/key-match? msg "j") [(update state :count dec) nil]
+    (msg/key-match? msg "q") [state program/quit-cmd]
+    (msg/key-match? msg "k") [(update state :count inc) nil]
+    (msg/key-match? msg "j") [(update state :count dec) nil]
     :else [state nil]))
 
 (defn view [state]
   (str "Count: " (:count state) "\n\n"
        "j/k to change, q to quit"))
 
-(charm/run {:init {:count 0}
-            :update update-fn
-            :view view})
+(program/run {:init {:count 0}
+              :update update-fn
+              :view view})
 ```
 
 ## API Overview
@@ -78,15 +81,15 @@ or via clojars maven repository
 ### Running a Program
 
 ```clojure
-(charm/run {:init    initial-state-or-fn
-            :update  (fn [state msg] [new-state cmd])
-            :view    (fn [state] "string to render")
+(program/run {:init    initial-state-or-fn
+              :update  (fn [state msg] [new-state cmd])
+              :view    (fn [state] "string to render")
 
-            ;; Options
-            :alt-screen false      ; Use [alternate screen buffer](#alternate-screen-buffer)
-            :mouse :cell           ; Mouse mode: nil, :normal, :cell, :all
-            :focus-reporting false ; Report focus in/out events
-            :fps 60})              ; Frames per second
+              ;; Options
+              :alt-screen false      ; Use [alternate screen buffer](#alternate-screen-buffer)
+              :mouse :cell           ; Mouse mode: nil, :normal, :cell, :all
+              :focus-reporting false ; Report focus in/out events
+              :fps 60})              ; Frames per second
 ```
 
 #### Alternate Screen Buffer
@@ -104,21 +107,21 @@ Messages are maps with a `:type` key. Built-in message types:
 
 ```clojure
 ;; Check message types
-(charm/key-press? msg)    ; Keyboard input
-(charm/mouse? msg)        ; Mouse event
-(charm/window-size? msg)  ; Terminal resized
-(charm/quit? msg)         ; Quit signal
+(msg/key-press? msg)    ; Keyboard input
+(msg/mouse? msg)        ; Mouse event
+(msg/window-size? msg)  ; Terminal resized
+(msg/quit? msg)         ; Quit signal
 
 ;; Match specific keys
-(charm/key-match? msg "q")        ; Letter q
-(charm/key-match? msg "ctrl+c")   ; Ctrl+C
-(charm/key-match? msg "enter")    ; Enter key
-(charm/key-match? msg :up)        ; Arrow up
+(msg/key-match? msg "q")        ; Letter q
+(msg/key-match? msg "ctrl+c")   ; Ctrl+C
+(msg/key-match? msg "enter")    ; Enter key
+(msg/key-match? msg :up)        ; Arrow up
 
 ;; Check modifiers
-(charm/ctrl? msg)
-(charm/alt? msg)
-(charm/shift? msg)
+(msg/ctrl? msg)
+(msg/alt? msg)
+(msg/shift? msg)
 ```
 
 ### Commands
@@ -127,47 +130,47 @@ Commands are async functions that produce messages:
 
 ```clojure
 ;; Quit the program
-charm/quit-cmd
+program/quit-cmd
 
 ;; Create a custom command
-(charm/cmd (fn [] (charm/key-press :custom)))
+(program/cmd (fn [] (msg/key-press :custom)))
 
 ;; Run multiple commands in parallel
-(charm/batch cmd1 cmd2 cmd3)
+(program/batch cmd1 cmd2 cmd3)
 
 ;; Run commands in sequence
-(charm/sequence-cmds cmd1 cmd2 cmd3)
+(program/sequence-cmds cmd1 cmd2 cmd3)
 ```
 
 ### Styling
 
 ```clojure
-(require '[charm.core :as charm])
+(require '[charm.style.core :as style])
 
 ;; Create a style
 (def my-style
-  (charm/style :fg charm/red
+  (style/style :fg style/red
                :bold true
                :padding [1 2]))
 
 ;; Apply style to text
-(charm/render my-style "Hello!")
+(style/render my-style "Hello!")
 
 ;; Shorthand
-(charm/styled "Hello!" :fg charm/green :italic true)
+(style/styled "Hello!" :fg style/green :italic true)
 
 ;; Colors
-(charm/rgb 255 100 50)      ; True color
-(charm/hex "#ff6432")       ; Hex color
-(charm/ansi :red)           ; ANSI 16 colors
-(charm/ansi256 196)         ; 256 palette
+(style/rgb 255 100 50)      ; True color
+(style/hex "#ff6432")       ; Hex color
+(style/ansi :red)           ; ANSI 16 colors
+(style/ansi256 196)         ; 256 palette
 
-;; Borders
-(charm/render (charm/style :border charm/rounded-border) "boxed")
+;; Borders (require '[charm.style.border :as border])
+(style/render (style/style :border border/rounded) "boxed")
 
 ;; Layout
-(charm/join-horizontal :top block1 block2)
-(charm/join-vertical :center block1 block2)
+(style/join-horizontal :top block1 block2)
+(style/join-vertical :center block1 block2)
 ```
 
 ## Examples
@@ -179,8 +182,7 @@ Please take a look at the [examples](docs/examples/README.md) in the docs folder
 ```
 charm.clj/
 ├── src/charm/
-│   ├── core.clj          ; Public API
-│   ├── program.clj       ; Event loop
+│   ├── program.clj       ; Event loop & program runner
 │   ├── terminal.clj      ; JLine wrapper
 │   ├── message.clj       ; Message types
 │   ├── ansi/
@@ -194,7 +196,18 @@ charm.clj/
 │   │   ├── core.clj      ; Style API
 │   │   ├── color.clj     ; Color definitions
 │   │   ├── border.clj    ; Border styles
+│   │   ├── overlay.clj   ; Overlay placement
 │   │   └── layout.clj    ; Padding, margin, alignment
+│   ├── components/
+│   │   ├── spinner.clj   ; Spinner animations
+│   │   ├── text_input.clj; Text input field
+│   │   ├── list.clj      ; Scrollable list
+│   │   ├── paginator.clj ; Page navigation
+│   │   ├── timer.clj     ; Countdown timer
+│   │   ├── progress.clj  ; Progress bar
+│   │   ├── viewport.clj  ; Scrollable content
+│   │   ├── table.clj     ; Table display
+│   │   └── help.clj      ; Help key bindings
 │   └── render/
 │       ├── core.clj      ; Renderer
 │       └── screen.clj    ; ANSI sequences

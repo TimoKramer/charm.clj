@@ -7,7 +7,7 @@ The layout API provides functions for combining and aligning text blocks.
 ### join-horizontal
 
 ```clojure
-(charm/join-horizontal position & texts)
+(style/join-horizontal position & texts)
 ```
 
 Join multiple text blocks side by side.
@@ -15,10 +15,10 @@ Join multiple text blocks side by side.
 **Position** specifies vertical alignment: `:top`, `:center`, or `:bottom`.
 
 ```clojure
-(charm/join-horizontal :top "Left" "Right")
+(style/join-horizontal :top "Left" "Right")
 ; LeftRight
 
-(charm/join-horizontal :top
+(style/join-horizontal :top
   "Line 1\nLine 2\nLine 3"
   "  |  "
   "A\nB")
@@ -31,16 +31,16 @@ Join multiple text blocks side by side.
 
 ```clojure
 (def box1
-  (charm/render
-    (charm/style :border charm/rounded-border :padding [0 1])
+  (style/render
+    (style/style :border border/rounded :padding [0 1])
     "Box 1"))
 
 (def box2
-  (charm/render
-    (charm/style :border charm/rounded-border :padding [0 1])
+  (style/render
+    (style/style :border border/rounded :padding [0 1])
     "Box 2"))
 
-(charm/join-horizontal :top box1 "  " box2)
+(style/join-horizontal :top box1 "  " box2)
 ; ╭───────╮  ╭───────╮
 ; │ Box 1 │  │ Box 2 │
 ; ╰───────╯  ╰───────╯
@@ -50,7 +50,7 @@ Join multiple text blocks side by side.
 
 ```clojure
 ;; Top aligned (default)
-(charm/join-horizontal :top
+(style/join-horizontal :top
   "Short"
   "Tall\ntext\nhere")
 ; ShortTall
@@ -58,7 +58,7 @@ Join multiple text blocks side by side.
 ;      here
 
 ;; Center aligned
-(charm/join-horizontal :center
+(style/join-horizontal :center
   "Short"
   "Tall\ntext\nhere")
 ;      Tall
@@ -66,7 +66,7 @@ Join multiple text blocks side by side.
 ;      here
 
 ;; Bottom aligned
-(charm/join-horizontal :bottom
+(style/join-horizontal :bottom
   "Short"
   "Tall\ntext\nhere")
 ;      Tall
@@ -77,7 +77,7 @@ Join multiple text blocks side by side.
 ### join-vertical
 
 ```clojure
-(charm/join-vertical position & texts)
+(style/join-vertical position & texts)
 ```
 
 Join multiple text blocks vertically (stacked).
@@ -85,11 +85,11 @@ Join multiple text blocks vertically (stacked).
 **Position** specifies horizontal alignment: `:left`, `:center`, or `:right`.
 
 ```clojure
-(charm/join-vertical :left "Top" "Bottom")
+(style/join-vertical :left "Top" "Bottom")
 ; Top
 ; Bottom
 
-(charm/join-vertical :center
+(style/join-vertical :center
   "Short"
   "Longer text"
   "Medium")
@@ -97,7 +97,7 @@ Join multiple text blocks vertically (stacked).
 ; Longer text
 ;   Medium
 
-(charm/join-vertical :right
+(style/join-vertical :right
   "Short"
   "Longer text"
   "Medium")
@@ -110,16 +110,16 @@ Join multiple text blocks vertically (stacked).
 
 ```clojure
 (def header
-  (charm/render
-    (charm/style :border charm/rounded-border :width 30 :align :center)
+  (style/render
+    (style/style :border border/rounded :width 30 :align :center)
     "Header"))
 
 (def content
-  (charm/render
-    (charm/style :border charm/normal-border :width 30)
+  (style/render
+    (style/style :border border/normal :width 30)
     "Content goes here"))
 
-(charm/join-vertical :left header content)
+(style/join-vertical :left header content)
 ; ╭──────────────────────────────╮
 ; │           Header             │
 ; ╰──────────────────────────────╯
@@ -128,33 +128,19 @@ Join multiple text blocks vertically (stacked).
 ; └──────────────────────────────┘
 ```
 
-## Alignment Constants
-
-```clojure
-;; Horizontal alignment
-charm/left
-charm/center
-charm/right
-
-;; Vertical alignment
-charm/top
-charm/bottom
-; charm/center (same constant)
-```
-
 ## Building Layouts
 
 ### Two-Column Layout
 
 ```clojure
 (defn two-column [left-content right-content]
-  (charm/join-horizontal :top
-    (charm/render
-      (charm/style :width 30 :border charm/normal-border)
+  (style/join-horizontal :top
+    (style/render
+      (style/style :width 30 :border border/normal)
       left-content)
     "  "
-    (charm/render
-      (charm/style :width 30 :border charm/normal-border)
+    (style/render
+      (style/style :width 30 :border border/normal)
       right-content)))
 ```
 
@@ -162,15 +148,15 @@ charm/bottom
 
 ```clojure
 (defn page-layout [header content footer]
-  (charm/join-vertical :left
-    (charm/render
-      (charm/style :width 60 :align :center :border charm/rounded-border)
+  (style/join-vertical :left
+    (style/render
+      (style/style :width 60 :align :center :border border/rounded)
       header)
-    (charm/render
-      (charm/style :width 60 :border charm/normal-border :padding [1 2])
+    (style/render
+      (style/style :width 60 :border border/normal :padding [1 2])
       content)
-    (charm/render
-      (charm/style :width 60 :align :center :fg 240)
+    (style/render
+      (style/style :width 60 :align :center :fg 240)
       footer)))
 ```
 
@@ -178,12 +164,12 @@ charm/bottom
 
 ```clojure
 (defn sidebar-layout [sidebar main-content]
-  (charm/join-horizontal :top
-    (charm/render
-      (charm/style :width 20 :border charm/normal-border)
+  (style/join-horizontal :top
+    (style/render
+      (style/style :width 20 :border border/normal)
       sidebar)
-    (charm/render
-      (charm/style :width 50 :border charm/normal-border :padding [0 1])
+    (style/render
+      (style/style :width 50 :border border/normal :padding [0 1])
       main-content)))
 ```
 
@@ -191,47 +177,49 @@ charm/bottom
 
 ```clojure
 (ns my-app
-  (:require [charm.core :as charm]))
+  (:require
+   [charm.style.border :as border]
+   [charm.style.core :as style]))
 
 (def title-style
-  (charm/style :fg charm/cyan :bold true :align :center))
+  (style/style :fg style/cyan :bold true :align :center))
 
 (def box-style
-  (charm/style :border charm/rounded-border :padding [0 1]))
+  (style/style :border border/rounded :padding [0 1]))
 
 (def dim-style
-  (charm/style :fg 240))
+  (style/style :fg 240))
 
 (defn render-sidebar [items selected]
-  (charm/render
-    (charm/style :border charm/normal-border :width 20)
+  (style/render
+    (style/style :border border/normal :width 20)
     (clojure.string/join "\n"
       (map-indexed
         (fn [i item]
           (if (= i selected)
-            (charm/render (charm/style :fg charm/cyan :bold true)
+            (style/render (style/style :fg style/cyan :bold true)
                          (str "> " item))
             (str "  " item)))
         items))))
 
 (defn render-content [text]
-  (charm/render
-    (charm/style :border charm/rounded-border
+  (style/render
+    (style/style :border border/rounded
                  :padding [1 2]
                  :width 40)
     text))
 
 (defn render-help []
-  (charm/render dim-style "j/k: navigate  q: quit"))
+  (style/render dim-style "j/k: navigate  q: quit"))
 
 (defn view [state]
   (let [sidebar (render-sidebar (:items state) (:selected state))
         content (render-content (nth (:items state) (:selected state)))
         help (render-help)]
-    (charm/join-vertical :left
-      (charm/render title-style "My Application")
+    (style/join-vertical :left
+      (style/render title-style "My Application")
       ""
-      (charm/join-horizontal :top sidebar "  " content)
+      (style/join-horizontal :top sidebar "  " content)
       ""
       help)))
 ```
@@ -244,10 +232,10 @@ Use empty strings for spacing:
 
 ```clojure
 ;; Horizontal spacing
-(charm/join-horizontal :top box1 "   " box2)  ; 3 spaces
+(style/join-horizontal :top box1 "   " box2)  ; 3 spaces
 
 ;; Vertical spacing
-(charm/join-vertical :left header "" "" content)  ; 2 blank lines
+(style/join-vertical :left header "" "" content)  ; 2 blank lines
 ```
 
 ### Consistent Widths
@@ -255,10 +243,10 @@ Use empty strings for spacing:
 Set explicit widths for alignment:
 
 ```clojure
-(charm/join-vertical :left
-  (charm/render (charm/style :width 40) "Row 1")
-  (charm/render (charm/style :width 40) "Row 2")
-  (charm/render (charm/style :width 40) "Row 3"))
+(style/join-vertical :left
+  (style/render (style/style :width 40) "Row 1")
+  (style/render (style/style :width 40) "Row 2")
+  (style/render (style/style :width 40) "Row 3"))
 ```
 
 ### Nesting Layouts
@@ -266,11 +254,11 @@ Set explicit widths for alignment:
 Layouts can be nested:
 
 ```clojure
-(charm/join-vertical :center
+(style/join-vertical :center
   header
-  (charm/join-horizontal :top
+  (style/join-horizontal :top
     left-panel
-    (charm/join-vertical :left
+    (style/join-vertical :left
       top-right
       bottom-right))
   footer)

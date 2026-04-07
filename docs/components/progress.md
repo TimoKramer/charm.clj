@@ -5,21 +5,21 @@ Progress indicator with 7 built-in bar styles.
 ## Quick Example
 
 ```clojure
-(require '[charm.core :as charm])
+(require '[charm.components.progress :as progress])
 
-(def my-bar (charm/progress-bar :width 40))
+(def my-bar (progress/progress-bar :width 40))
 
 ;; Update progress (0.0 to 1.0)
-(def updated-bar (charm/progress-set-progress my-bar 0.5))
+(def updated-bar (progress/set-progress my-bar 0.5))
 
 ;; In view function
-(charm/progress-view updated-bar)  ; => "████████████████████░░░░░░░░░░░░░░░░░░░░"
+(progress/progress-view updated-bar)  ; => "████████████████████░░░░░░░░░░░░░░░░░░░░"
 ```
 
 ## Creation Options
 
 ```clojure
-(charm/progress-bar & options)
+(progress/progress-bar & options)
 ```
 
 | Option | Type | Default | Description |
@@ -49,14 +49,14 @@ Progress indicator with 7 built-in bar styles.
 ## Custom Bar Style
 
 ```clojure
-(charm/progress-bar :bar-style {:full "▰"
-                                :empty "▱"})
+(progress/progress-bar :bar-style {:full "▰"
+                                   :empty "▱"})
 
 ;; With brackets
-(charm/progress-bar :bar-style {:full "="
-                                :empty " "
-                                :left "["
-                                :right "]"})
+(progress/progress-bar :bar-style {:full "="
+                                   :empty " "
+                                   :left "["
+                                   :right "]"})
 ```
 
 ## Functions
@@ -64,59 +64,62 @@ Progress indicator with 7 built-in bar styles.
 ### progress-view
 
 ```clojure
-(charm/progress-view bar) ; => "████████░░░░░░░░"
+(progress/progress-view bar) ; => "████████░░░░░░░░"
 ```
 
 Render the progress bar as a string.
 
-### progress-set-progress
+### set-progress
 
 ```clojure
-(charm/progress-set-progress bar 0.75) ; Set to 75%
+(progress/set-progress bar 0.75) ; Set to 75%
 ```
 
 Set progress as a float from 0.0 to 1.0.
 
-### progress-set-progress-int
+### set-progress-int
 
 ```clojure
-(charm/progress-set-progress-int bar 75) ; Set to 75%
+(progress/set-progress-int bar 75) ; Set to 75%
 ```
 
 Set progress as an integer from 0 to 100.
 
-### progress-increment / progress-decrement
+### increment / decrement
 
 ```clojure
-(charm/progress-increment bar)      ; +1%
-(charm/progress-increment bar 0.05) ; +5%
-(charm/progress-decrement bar 0.1)  ; -10%
+(progress/increment bar)      ; +1%
+(progress/increment bar 0.05) ; +5%
+(progress/decrement bar 0.1)  ; -10%
 ```
 
-### progress-percent
+### percent
 
 ```clojure
-(charm/progress-percent bar)     ; => 0.75 (float)
-(charm/progress-percent-int bar) ; => 75 (int)
+(progress/percent bar)     ; => 0.75 (float)
+(progress/percent-int bar) ; => 75 (int)
 ```
 
-### progress-complete?
+### complete?
 
 ```clojure
-(charm/progress-complete? bar) ; => true if >= 100%
+(progress/complete? bar) ; => true if >= 100%
 ```
 
-### progress-reset
+### reset
 
 ```clojure
-(charm/progress-reset bar) ; Reset to 0%
+(progress/reset bar) ; Reset to 0%
 ```
 
 ## Full Example
 
 ```clojure
 (ns my-app
-  (:require [charm.core :as charm]))
+  (:require
+   [charm.components.progress :as progress]
+   [charm.message :as msg]
+   [charm.program :as program]))
 
 (defn tick-cmd []
   {:type :cmd
@@ -125,24 +128,24 @@ Set progress as an integer from 0 to 100.
          {:type :tick})})
 
 (defn init []
-  [{:bar (charm/progress-bar :width 50
-                             :bar-style :default
-                             :show-percent true)
+  [{:bar (progress/progress-bar :width 50
+                                :bar-style :default
+                                :show-percent true)
     :running false}
    nil])
 
 (defn update-fn [state msg]
   (cond
-    (charm/key-match? msg "q")
-    [state charm/quit-cmd]
+    (msg/key-match? msg "q")
+    [state program/quit-cmd]
 
-    (charm/key-match? msg " ")
+    (msg/key-match? msg " ")
     [(assoc state :running (not (:running state)))
      (when-not (:running state) (tick-cmd))]
 
     (= :tick (:type msg))
-    (let [bar (charm/progress-increment (:bar state) 0.02)]
-      (if (charm/progress-complete? bar)
+    (let [bar (progress/increment (:bar state) 0.02)]
+      (if (progress/complete? bar)
         [(assoc state :bar bar :running false) nil]
         [(assoc state :bar bar)
          (when (:running state) (tick-cmd))]))
@@ -152,32 +155,32 @@ Set progress as an integer from 0 to 100.
 
 (defn view [state]
   (str "Download Progress\n\n"
-       (charm/progress-view (:bar state)) "\n\n"
-       (if (charm/progress-complete? (:bar state))
+       (progress/progress-view (:bar state)) "\n\n"
+       (if (progress/complete? (:bar state))
          "Complete!"
          (if (:running state)
            "Downloading... (Space to pause)"
            "Press Space to start, Q to quit"))))
 
-(charm/run {:init init :update update-fn :view view})
+(program/run {:init init :update update-fn :view view})
 ```
 
 ## Styled Progress Bar
 
 ```clojure
-(charm/progress-bar :width 40
-                    :bar-style :default
-                    :show-percent true
-                    :full-style (charm/style :fg charm/green)
-                    :empty-style (charm/style :fg 240)
-                    :percent-style (charm/style :fg charm/yellow :bold true))
+(progress/progress-bar :width 40
+                       :bar-style :default
+                       :show-percent true
+                       :full-style (style/style :fg style/green)
+                       :empty-style (style/style :fg 240)
+                       :percent-style (style/style :fg style/yellow :bold true))
 ```
 
 ## Multiple Progress Bars
 
 ```clojure
 (defn view [state]
-  (str "File 1: " (charm/progress-view (:bar1 state)) "\n"
-       "File 2: " (charm/progress-view (:bar2 state)) "\n"
-       "File 3: " (charm/progress-view (:bar3 state))))
+  (str "File 1: " (progress/progress-view (:bar1 state)) "\n"
+       "File 2: " (progress/progress-view (:bar2 state)) "\n"
+       "File 3: " (progress/progress-view (:bar3 state))))
 ```

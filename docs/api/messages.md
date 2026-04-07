@@ -7,7 +7,7 @@ Messages are plain maps with a `:type` key that flow through the update function
 ### key-press
 
 ```clojure
-(charm/key-press key & options)
+(msg/key-press key & options)
 ```
 
 Create a key press message (mainly for testing).
@@ -22,15 +22,15 @@ Create a key press message (mainly for testing).
 | `:shift` | boolean | `false` | Shift modifier |
 
 ```clojure
-(charm/key-press "a")
-(charm/key-press :enter)
-(charm/key-press "c" :ctrl true)
+(msg/key-press "a")
+(msg/key-press :enter)
+(msg/key-press "c" :ctrl true)
 ```
 
 ### key-press?
 
 ```clojure
-(charm/key-press? msg) ; => boolean
+(msg/key-press? msg) ; => boolean
 ```
 
 Check if a message is a key press.
@@ -38,7 +38,7 @@ Check if a message is a key press.
 ### key-match?
 
 ```clojure
-(charm/key-match? msg key) ; => boolean
+(msg/key-match? msg key) ; => boolean
 ```
 
 Check if a key press matches a specific key pattern.
@@ -75,19 +75,19 @@ Check if a key press matches a specific key pattern.
 ```clojure
 (defn update-fn [state msg]
   (cond
-    (charm/key-match? msg "q") [state charm/quit-cmd]
-    (charm/key-match? msg :enter) [(submit state) nil]
-    (charm/key-match? msg "ctrl+c") [state charm/quit-cmd]
-    (charm/key-match? msg :up) [(move-up state) nil]
+    (msg/key-match? msg "q") [state program/quit-cmd]
+    (msg/key-match? msg :enter) [(submit state) nil]
+    (msg/key-match? msg "ctrl+c") [state program/quit-cmd]
+    (msg/key-match? msg :up) [(move-up state) nil]
     :else [state nil]))
 ```
 
 ### Modifier Predicates
 
 ```clojure
-(charm/ctrl? msg)  ; => boolean - Ctrl modifier set?
-(charm/alt? msg)   ; => boolean - Alt modifier set?
-(charm/shift? msg) ; => boolean - Shift modifier set?
+(msg/ctrl? msg)  ; => boolean - Ctrl modifier set?
+(msg/alt? msg)   ; => boolean - Alt modifier set?
+(msg/shift? msg) ; => boolean - Shift modifier set?
 ```
 
 ## Mouse Messages
@@ -95,7 +95,7 @@ Check if a key press matches a specific key pattern.
 ### mouse
 
 ```clojure
-(charm/mouse action button x y & options)
+(msg/mouse action button x y & options)
 ```
 
 Create a mouse event message (mainly for testing).
@@ -112,14 +112,14 @@ Create a mouse event message (mainly for testing).
 **Options:** `:ctrl`, `:alt`, `:shift` (boolean modifiers)
 
 ```clojure
-(charm/mouse :press :left 10 5)
-(charm/mouse :wheel-up :none 10 5)
+(msg/mouse :press :left 10 5)
+(msg/mouse :wheel-up :none 10 5)
 ```
 
 ### mouse?
 
 ```clojure
-(charm/mouse? msg) ; => boolean
+(msg/mouse? msg) ; => boolean
 ```
 
 Check if a message is a mouse event.
@@ -142,11 +142,11 @@ Check if a message is a mouse event.
 ```clojure
 (defn update-fn [state msg]
   (cond
-    (and (charm/mouse? msg) (= :press (:action msg)))
+    (and (msg/mouse? msg) (= :press (:action msg)))
     (let [{:keys [x y button]} msg]
       [(handle-click state x y button) nil])
 
-    (and (charm/mouse? msg) (= :wheel-up (:action msg)))
+    (and (msg/mouse? msg) (= :wheel-up (:action msg)))
     [(scroll-up state) nil]
 
     :else
@@ -158,7 +158,7 @@ Check if a message is a mouse event.
 ### window-size
 
 ```clojure
-(charm/window-size width height)
+(msg/window-size width height)
 ```
 
 Create a window size message (sent automatically on resize).
@@ -166,7 +166,7 @@ Create a window size message (sent automatically on resize).
 ### window-size?
 
 ```clojure
-(charm/window-size? msg) ; => boolean
+(msg/window-size? msg) ; => boolean
 ```
 
 **Window size message structure:**
@@ -181,7 +181,7 @@ Create a window size message (sent automatically on resize).
 
 ```clojure
 (defn update-fn [state msg]
-  (if (charm/window-size? msg)
+  (if (msg/window-size? msg)
     [(assoc state
             :width (:width msg)
             :height (:height msg))
@@ -194,15 +194,15 @@ Create a window size message (sent automatically on resize).
 ### focus / blur
 
 ```clojure
-(charm/focus) ; Create focus gained message
-(charm/blur)  ; Create focus lost message
+(msg/focus) ; Create focus gained message
+(msg/blur)  ; Create focus lost message
 ```
 
 ### focus? / blur?
 
 ```clojure
-(charm/focus? msg) ; => boolean
-(charm/blur? msg)  ; => boolean
+(msg/focus? msg) ; => boolean
+(msg/blur? msg)  ; => boolean
 ```
 
 Requires `:focus-reporting true` in run options.
@@ -210,10 +210,10 @@ Requires `:focus-reporting true` in run options.
 ```clojure
 (defn update-fn [state msg]
   (cond
-    (charm/focus? msg)
+    (msg/focus? msg)
     [(assoc state :active true) nil]
 
-    (charm/blur? msg)
+    (msg/blur? msg)
     [(assoc state :active false) nil]
 
     :else
@@ -225,25 +225,25 @@ Requires `:focus-reporting true` in run options.
 ### quit
 
 ```clojure
-(charm/quit) ; Create quit message
+(msg/quit) ; Create quit message
 ```
 
 ### quit?
 
 ```clojure
-(charm/quit? msg) ; => boolean
+(msg/quit? msg) ; => boolean
 ```
 
 ### error
 
 ```clojure
-(charm/error throwable) ; Create error message
+(msg/error throwable) ; Create error message
 ```
 
 ### error?
 
 ```clojure
-(charm/error? msg) ; => boolean
+(msg/error? msg) ; => boolean
 ```
 
 ## Message Type Helper
@@ -251,13 +251,13 @@ Requires `:focus-reporting true` in run options.
 ### msg-type
 
 ```clojure
-(charm/msg-type msg) ; => keyword
+(msg/msg-type msg) ; => keyword
 ```
 
 Get the type of any message.
 
 ```clojure
-(charm/msg-type {:type :key-press :key "a"}) ; => :key-press
+(msg/msg-type {:type :key-press :key "a"}) ; => :key-press
 ```
 
 ## Custom Messages
@@ -287,35 +287,37 @@ Create custom messages as plain maps with a `:type` key:
 
 ```clojure
 (ns my-app
-  (:require [charm.core :as charm]))
+  (:require
+   [charm.message :as msg]
+   [charm.program :as program]))
 
 (defn update-fn [state msg]
   (cond
     ;; Quit on q or Ctrl+C
-    (or (charm/key-match? msg "q")
-        (charm/key-match? msg "ctrl+c"))
-    [state charm/quit-cmd]
+    (or (msg/key-match? msg "q")
+        (msg/key-match? msg "ctrl+c"))
+    [state program/quit-cmd]
 
     ;; Navigation
-    (charm/key-match? msg :up)
+    (msg/key-match? msg :up)
     [(update state :cursor dec) nil]
 
-    (charm/key-match? msg :down)
+    (msg/key-match? msg :down)
     [(update state :cursor inc) nil]
 
     ;; Window resize
-    (charm/window-size? msg)
+    (msg/window-size? msg)
     [(assoc state :size [(:width msg) (:height msg)]) nil]
 
     ;; Mouse click
-    (and (charm/mouse? msg) (= :press (:action msg)))
+    (and (msg/mouse? msg) (= :press (:action msg)))
     [(assoc state :clicked [(:x msg) (:y msg)]) nil]
 
     ;; Focus changes
-    (charm/focus? msg)
+    (msg/focus? msg)
     [(assoc state :focused true) nil]
 
-    (charm/blur? msg)
+    (msg/blur? msg)
     [(assoc state :focused false) nil]
 
     :else

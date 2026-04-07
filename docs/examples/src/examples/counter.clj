@@ -1,31 +1,35 @@
 (ns examples.counter
-  (:require [charm.core :as charm]))
+  (:require
+   [charm.message :as msg]
+   [charm.program :as program]
+   [charm.style.border :as border]
+   [charm.style.core :as style]))
 
 (def state (atom 0))
 
 (def title-style
-  (charm/style :fg charm/magenta :bold true))
+  (style/style :fg style/magenta :bold true))
 
 (def count-style
-  (charm/style :fg charm/cyan
+  (style/style :fg style/cyan
                :padding [0 1]
-               :border charm/rounded-border))
+               :border border/rounded))
 
 (defn update-fn [state msg]
   (cond
     ;; Quit on q or Ctrl+C
-    (or (charm/key-match? msg "q")
-        (charm/key-match? msg "ctrl+c"))
-    [state charm/quit-cmd]
+    (or (msg/key-match? msg "q")
+        (msg/key-match? msg "ctrl+c"))
+    [state program/quit-cmd]
 
     ;; Increment on k or up arrow
-    (or (charm/key-match? msg "k")
-        (charm/key-match? msg :up))
+    (or (msg/key-match? msg "k")
+        (msg/key-match? msg :up))
     [(update state :count inc) nil]
 
     ;; Decrement on j or down arrow
-    (or (charm/key-match? msg "j")
-        (charm/key-match? msg :down))
+    (or (msg/key-match? msg "j")
+        (msg/key-match? msg :down))
     [(update state :count dec) nil]
 
     ;; Ignore other messages
@@ -33,13 +37,13 @@
     [state nil]))
 
 (defn view [state]
-  (str (charm/render title-style "Counter App") "\n\n"
-       (charm/render count-style (str (:count state))) "\n\n"
+  (str (style/render title-style "Counter App") "\n\n"
+       (style/render count-style (str (:count state))) "\n\n"
        "j/k or arrows to change\n"
        "q to quit"))
 
 (defn -main [& args]
-  (charm/run {:init {:count 0}
-              :update update-fn
-              :view view
-              :alt-screen true}))
+  (program/run {:init {:count 0}
+                :update update-fn
+                :view view
+                :alt-screen true}))

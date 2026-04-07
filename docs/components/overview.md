@@ -34,22 +34,23 @@ Components integrate with charm's program loop which handles:
 - **Rendering**: The view function renders state to strings
 
 ```clojure
-(require '[charm.core :as charm])
+(require '[charm.components.spinner :as spinner]
+         '[charm.program :as program])
 
 (defn init []
-  [{:spinner (charm/spinner :dots)}
+  [{:spinner (spinner/spinner :dots)}
    nil])
 
 (defn update-fn [state msg]
-  (let [[new-spinner cmd] (charm/spinner-update (:spinner state) msg)]
+  (let [[new-spinner cmd] (spinner/spinner-update (:spinner state) msg)]
     [(assoc state :spinner new-spinner) cmd]))
 
 (defn view [state]
-  (str "Loading " (charm/spinner-view (:spinner state))))
+  (str "Loading " (spinner/spinner-view (:spinner state))))
 
-(charm/run {:init init
-            :update update-fn
-            :view view})
+(program/run {:init init
+              :update update-fn
+              :view view})
 ```
 
 ## Available Components
@@ -74,7 +75,7 @@ Components like `spinner` and `timer` use asynchronous tick commands to animate.
 
 ```clojure
 ;; Spinner sends tick messages to itself
-(let [[spinner cmd] (charm/spinner-init my-spinner)]
+(let [[s cmd] (spinner/spinner-init my-spinner)]
   ;; cmd will trigger a :spinner-tick message after the interval
   )
 ```
@@ -85,27 +86,27 @@ Multiple components can be combined in a single application:
 
 ```clojure
 (defn init []
-  [{:input (charm/text-input :prompt "Search: ")
-    :list (charm/item-list items)
-    :help (charm/help bindings)}
+  [{:input (text-input/text-input :prompt "Search: ")
+    :list (item-list/item-list items)
+    :help (help/help bindings)}
    nil])
 
 (defn update-fn [state msg]
   (cond
     ;; Route to text-input when focused
     (:focused (:input state))
-    (let [[input cmd] (charm/text-input-update (:input state) msg)]
+    (let [[input cmd] (text-input/text-input-update (:input state) msg)]
       [(assoc state :input input) cmd])
 
     ;; Otherwise route to list
     :else
-    (let [[list cmd] (charm/list-update (:list state) msg)]
+    (let [[list cmd] (item-list/list-update (:list state) msg)]
       [(assoc state :list list) cmd])))
 
 (defn view [state]
-  (str (charm/text-input-view (:input state)) "\n"
-       (charm/list-view (:list state)) "\n"
-       (charm/short-help-view (:help state))))
+  (str (text-input/text-input-view (:input state)) "\n"
+       (item-list/list-view (:list state)) "\n"
+       (help/short-help-view (:help state))))
 ```
 
 ## Styling Components
@@ -113,17 +114,17 @@ Multiple components can be combined in a single application:
 Most components accept style options:
 
 ```clojure
-(charm/spinner :dots
-               :style (charm/style :fg charm/cyan))
+(spinner/spinner :dots
+                 :style (style/style :fg style/cyan))
 
-(charm/text-input :prompt "Name: "
-                  :prompt-style (charm/style :fg charm/green :bold true)
-                  :text-style (charm/style :fg charm/white)
-                  :cursor-style (charm/style :reverse true))
+(text-input/text-input :prompt "Name: "
+                       :prompt-style (style/style :fg style/green :bold true)
+                       :text-style (style/style :fg style/white)
+                       :cursor-style (style/style :reverse true))
 
-(charm/item-list items
-                 :cursor-style (charm/style :fg charm/yellow :bold true)
-                 :item-style (charm/style :fg 240))
+(item-list/item-list items
+                     :cursor-style (style/style :fg style/yellow :bold true)
+                     :item-style (style/style :fg 240))
 ```
 
 See [styling](../api/styling.md) for full styling documentation.

@@ -1,7 +1,10 @@
 (ns examples.download
   "Simulated download demonstrating all progress bar styles."
   (:require
-   [charm.core :as charm]
+   [charm.components.progress :as progress]
+   [charm.message :as msg]
+   [charm.program :as program]
+   [charm.style.core :as style]
    [clojure.string :as str]))
 
 (def bar-style-names
@@ -9,16 +12,16 @@
   [:default :ascii :thin :thick :blocks :arrows :dots :brackets])
 
 (def title-style
-  (charm/style :fg charm/magenta :bold true))
+  (style/style :fg style/magenta :bold true))
 
 (def label-style
-  (charm/style :fg charm/cyan))
+  (style/style :fg style/cyan))
 
 (def complete-style
-  (charm/style :fg charm/green :bold true))
+  (style/style :fg style/green :bold true))
 
 (def hint-style
-  (charm/style :fg 240))
+  (style/style :fg 240))
 
 (defn tick-msg
   "Create a progress tick message."
@@ -43,9 +46,9 @@
   []
   (into {}
         (map (fn [style-name]
-               [style-name (charm/progress-bar :width 30
-                                               :bar-style style-name
-                                               :show-percent true)])
+               [style-name (progress/progress-bar :width 30
+                                                  :bar-style style-name
+                                                  :show-percent true)])
              bar-style-names)))
 
 (defn init []
@@ -76,23 +79,23 @@
 (defn all-complete?
   "Check if all bars are complete."
   [bars]
-  (every? charm/progress-complete? (vals bars)))
+  (every? progress/complete? (vals bars)))
 
 (defn update-fn [state msg]
   (cond
     ;; Quit
-    (or (charm/key-match? msg "q")
-        (charm/key-match? msg "ctrl+c")
-        (charm/key-match? msg "esc"))
-    [state charm/quit-cmd]
+    (or (msg/key-match? msg "q")
+        (msg/key-match? msg "ctrl+c")
+        (msg/key-match? msg "esc"))
+    [state program/quit-cmd]
 
     ;; Space to start
     (and (not (:running state))
-         (charm/key-match? msg " "))
+         (msg/key-match? msg " "))
     (start-download state)
 
     ;; R to reset
-    (charm/key-match? msg "r")
+    (msg/key-match? msg "r")
     (reset-download state)
 
     ;; Progress tick - increment all bars with random variation
@@ -104,7 +107,7 @@
           new-bars (reduce (fn [bars style-name]
                              (let [bar (get bars style-name)
                                    increment (+ 0.005 (* 0.015 (rand)))]
-                               (assoc bars style-name (charm/progress-increment bar increment))))
+                               (assoc bars style-name (progress/increment bar increment))))
                            bars
                            bar-style-names)
           all-done? (all-complete? new-bars)
@@ -122,34 +125,33 @@
   "Render a single progress bar with label."
   [bars style-name]
   (let [bar (get bars style-name)
-        label (name style-name)
-        complete? (charm/progress-complete? bar)]
-    (str (charm/render label-style (format "%-10s" label))
+        complete? (progress/complete? bar)]
+    (str (style/render label-style (format "%-10s" (name style-name)))
          " "
-         (charm/progress-view bar)
+         (progress/progress-view bar)
          (when complete?
-           (str " " (charm/render complete-style "Done!"))))))
+           (str " " (style/render complete-style "Done!"))))))
 
 (defn view [state]
   (let [{:keys [bars running]} state
         all-done? (all-complete? bars)]
-    (str (charm/render title-style "Download Demo") "\n"
-         (charm/render hint-style "Demonstrating all progress bar styles") "\n\n"
+    (str (style/render title-style "Download Demo") "\n"
+         (style/render hint-style "Demonstrating all progress bar styles") "\n\n"
          (str/join "\n" (map #(render-bar bars %) bar-style-names))
          "\n\n"
          (cond
            all-done?
-           (str (charm/render complete-style "All downloads complete!") "\n\n"
-                (charm/render hint-style "Press R to restart, Q to quit"))
+           (str (style/render complete-style "All downloads complete!") "\n\n"
+                (style/render hint-style "Press R to restart, Q to quit"))
 
            running
-           (charm/render hint-style "Downloading... Press R to reset, Q to quit")
+           (style/render hint-style "Downloading... Press R to reset, Q to quit")
 
            :else
-           (charm/render hint-style "Press Space to start download, Q to quit")))))
+           (style/render hint-style "Press Space to start download, Q to quit")))))
 
 (defn -main [& _args]
-  (charm/run {:init init
-              :update update-fn
-              :view view
-              :alt-screen true}))
+  (program/run {:init init
+                :update update-fn
+                :view view
+                :alt-screen true}))
