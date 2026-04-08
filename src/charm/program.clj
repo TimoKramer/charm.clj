@@ -112,21 +112,11 @@
                         ;; Convert input event to message
                         (let [m (cond
                                   (= :mouse (:type event))
-                                  (let [raw-button (:button event)
-                                        wheel (case (int raw-button)
-                                                4 :wheel-up   5 :wheel-down
-                                                6 :wheel-left 7 :wheel-right
-                                                nil)]
-                                    (msg/mouse (if wheel wheel (:action event))
-                                               (if wheel
-                                                 :none
-                                                 (case (int raw-button)
-                                                   0 :left 1 :middle 2 :right
-                                                   :none))
-                                               (:x event) (:y event)
-                                               :ctrl (:ctrl event)
-                                               :alt (:alt event)
-                                               :shift (:shift event)))
+                                  (msg/mouse (:button event) (:x event) (:y event)
+                                             :action (:action event)
+                                             :ctrl (:ctrl event)
+                                             :alt (:alt event)
+                                             :shift (:shift event))
 
                                   (= :focus (:type event))
                                   (msg/focus)

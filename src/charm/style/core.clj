@@ -274,13 +274,6 @@
 (def join-horizontal l/join-horizontal)
 (def join-vertical l/join-vertical)
 
-;; Text width utilities
-(def string-width w/string-width)
-(def truncate w/truncate)
-(def pad-right w/pad-right)
-(def pad-left w/pad-left)
-(def strip-ansi w/strip-ansi)
-
 ;; ---------------------------------------------------------------------------
 ;; Frame Size Calculation
 ;; ---------------------------------------------------------------------------

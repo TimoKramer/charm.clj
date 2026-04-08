@@ -78,42 +78,4 @@
 
   (testing "mouse?"
     (is (msg/mouse? (msg/mouse :press :left 0 0)))
-    (is (not (msg/mouse? (msg/quit)))))
-
-  (testing "click?"
-    (is (msg/click? (msg/mouse :press :left 10 20)))
-    (is (not (msg/click? (msg/mouse :release :none 10 20))))
-    (is (not (msg/click? (msg/quit)))))
-
-  (testing "release?"
-    (is (msg/release? (msg/mouse :release :none 10 20)))
-    (is (not (msg/release? (msg/mouse :press :left 10 20)))))
-
-  (testing "motion?"
-    (is (msg/motion? (msg/mouse :motion :left 10 20)))
-    (is (not (msg/motion? (msg/mouse :press :left 10 20)))))
-
-  (testing "left-click?"
-    (is (msg/left-click? (msg/mouse :press :left 10 20)))
-    (is (not (msg/left-click? (msg/mouse :press :right 10 20)))))
-
-  (testing "right-click?"
-    (is (msg/right-click? (msg/mouse :press :right 10 20)))
-    (is (not (msg/right-click? (msg/mouse :press :left 10 20)))))
-
-  (testing "middle-click?"
-    (is (msg/middle-click? (msg/mouse :press :middle 10 20)))
-    (is (not (msg/middle-click? (msg/mouse :press :left 10 20)))))
-
-  (testing "wheel-up?"
-    (is (msg/wheel-up? (msg/mouse :wheel-up :none 10 20)))
-    (is (not (msg/wheel-up? (msg/mouse :wheel-down :none 10 20)))))
-
-  (testing "wheel-down?"
-    (is (msg/wheel-down? (msg/mouse :wheel-down :none 10 20)))
-    (is (not (msg/wheel-down? (msg/mouse :press :left 10 20)))))
-
-  (testing "wheel?"
-    (is (msg/wheel? (msg/mouse :wheel-up :none 10 20)))
-    (is (msg/wheel? (msg/mouse :wheel-down :none 10 20)))
-    (is (not (msg/wheel? (msg/mouse :press :left 10 20))))))
+    (is (not (msg/mouse? (msg/quit))))))

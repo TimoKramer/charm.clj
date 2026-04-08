@@ -1,4 +1,4 @@
-(ns ^:no-doc charm.input.mouse
+(ns charm.input.mouse
   "Mouse event parsing for terminal input.
 
    Supports:
