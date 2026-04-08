@@ -1,4 +1,4 @@
-(ns charm.style.layout
+(ns ^:no-doc charm.style.layout
   "Layout utilities: padding, margin, alignment, and joining."
   (:require [charm.ansi.width :as w]
             [charm.style.color :as color]

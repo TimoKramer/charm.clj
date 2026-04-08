@@ -1,4 +1,4 @@
-(ns charm.ansi.parser
+(ns ^:no-doc charm.ansi.parser
   "ANSI escape sequence parsing.
 
    Parses ANSI escape sequences into structured data for processing."

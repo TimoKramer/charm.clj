@@ -1,4 +1,4 @@
-(ns charm.input.keys
+(ns ^:no-doc charm.input.keys
   "Key sequence definitions and parsing.
 
    Maps terminal escape sequences to key types and provides

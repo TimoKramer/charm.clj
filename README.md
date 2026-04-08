@@ -17,7 +17,7 @@ encounter any issues.
 ## Features
 
 - **Elm Architecture** - Simple init/update/view pattern for predictable state management
-- **UI Components** - Spinner, text-input, list, paginator, timer, progress, help
+- **UI Components** - Spinner, text-input, list, paginator, timer, progress, help, viewport, table
 - **Styling** - Colors (ANSI, 256, true color), borders, padding, alignment
 - **Input handling** - Keyboard and mouse events with modifier support
 - **Efficient rendering** - Line diffing for minimal terminal updates

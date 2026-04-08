@@ -1,4 +1,4 @@
-(ns charm.input.handler
+(ns ^:no-doc charm.input.handler
   "Terminal input handling.
 
    Reads raw terminal input and converts it to structured
