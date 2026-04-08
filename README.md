@@ -25,18 +25,18 @@ encounter any issues.
 
 ## Documentation
 
-- **[Getting Started](docs/guides/getting-started.md)** - Build your first app
-- **[Components](docs/components/overview.md)** - UI component reference
-  - [spinner](docs/components/spinner.md), [text-input](docs/components/text-input.md), [list](docs/components/list.md), [paginator](docs/components/paginator.md), [timer](docs/components/timer.md), [progress](docs/components/progress.md), [help](docs/components/help.md)
+- **[Getting Started](doc/guides/getting-started.md)** - Build your first app
+- **[Components](doc/components/overview.md)** - UI component reference
+  - [spinner](doc/components/spinner.md), [text-input](doc/components/text-input.md), [list](doc/components/list.md), [paginator](doc/components/paginator.md), [timer](doc/components/timer.md), [progress](doc/components/progress.md), [help](doc/components/help.md)
 - **API Reference**
-  - [Program](docs/api/program.md) - run, cmd, batch, quit-cmd
-  - [Messages](docs/api/messages.md) - key-press, mouse, window-size
-  - [Styling](docs/api/styling.md) - style, render, colors, borders
-  - [Layout](docs/api/layout.md) - join-horizontal, join-vertical
+  - [Program](doc/api/program.md) - run, cmd, batch, quit-cmd
+  - [Messages](doc/api/messages.md) - key-press, mouse, window-size
+  - [Styling](doc/api/styling.md) - style, render, colors, borders
+  - [Layout](doc/api/layout.md) - join-horizontal, join-vertical
 - **Guides**
-  - [Component Composition](docs/guides/component-composition.md)
-  - [Styling Patterns](docs/guides/styling-patterns.md)
-- **[Examples](docs/examples/README.md)** - Runnable demo applications
+  - [Component Composition](doc/guides/component-composition.md)
+  - [Styling Patterns](doc/guides/styling-patterns.md)
+- **[Examples](doc/examples/README.md)** - Runnable demo applications
 
 ## Installation
 
@@ -179,7 +179,7 @@ program/quit-cmd
 
 ## Examples
 
-Please take a look at the [examples](docs/examples/README.md) in the docs folder and don't hesitate to contribute your examples please.
+Please take a look at the [examples](doc/examples/README.md) in the doc folder and don't hesitate to contribute your examples please.
 
 ## Project Structure
 
