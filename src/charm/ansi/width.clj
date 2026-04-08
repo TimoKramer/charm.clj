@@ -1,4 +1,4 @@
-(ns charm.ansi.width
+(ns ^:no-doc charm.ansi.width
   "Text width calculation for terminal display.
 
    Handles:
