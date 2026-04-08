@@ -1,7 +1,8 @@
 # charm.clj
 
-![Status](https://img.shields.io/badge/status-alpha-orange)
+![Status](https://img.shields.io/badge/status-beta-blue)
 [![Clojars Project](https://img.shields.io/clojars/v/de.timokramer/charm.clj.svg)](https://clojars.org/de.timokramer/charm.clj)
+[![GitHub tag](https://img.shields.io/github/v/tag/TimoKramer/charm.clj?label=git%20tag)](https://github.com/TimoKramer/charm.clj/tags)
 
 A Clojure TUI (Terminal User Interface) library inspired by [Bubble Tea](https://github.com/charmbracelet/bubbletea).
 
@@ -10,8 +11,8 @@ on the JVM, as a native-image binary or on [babashka](https://babashka.org).
 
 ## Status
 
-This library is vibecoded and very early. It works for the examples but please let me know if you encounter any
-issues. I am planning to use it for something more sophisticated. Please expect breaking changes.
+This library is in beta. The API is stabilizing but breaking changes may still occur. Please let me know if you
+encounter any issues.
 
 ## Features
 
@@ -39,15 +40,18 @@ issues. I am planning to use it for something more sophisticated. Please expect 
 
 ## Installation
 
-Add to your `deps.edn`:
+Add to your `deps.edn`. Click the badges to find the latest version and git tag:
 
-via github
+[![Clojars](https://img.shields.io/clojars/v/de.timokramer/charm.clj.svg)](https://clojars.org/de.timokramer/charm.clj)
+
 ```clojure
-{:deps {io.github.timokramer/charm.clj {:git/tag "v0.1.64" :git/sha "e5120a9"}}}
+{:deps {de.timokramer/charm.clj {:mvn/version "VERSION"}}}
 ```
-or via clojars maven repository
+
+[![GitHub tag](https://img.shields.io/github/v/tag/TimoKramer/charm.clj)](https://github.com/TimoKramer/charm.clj/tags)
+
 ```clojure
-{:deps {de.timokramer/charm.clj {:mvn/version "0.1.64"}}}
+{:deps {io.github.timokramer/charm.clj {:git/tag "TAG" :git/sha "SHA"}}}
 ```
 
 

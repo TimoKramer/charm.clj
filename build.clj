@@ -5,7 +5,7 @@
    [deps-deploy.deps-deploy :as dd]))
 
 (def lib 'de.timokramer/charm.clj)
-(def version "0.1.")
+(def version "0.2.")
 (def class-dir "target/classes")
 
 (defn- version-str []
