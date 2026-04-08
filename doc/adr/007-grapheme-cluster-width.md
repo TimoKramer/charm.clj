@@ -1,4 +1,4 @@
-# ADR 006: Grapheme Cluster Width via JLine 4 Mode 2027
+# ADR 007: Grapheme Cluster Width via JLine 4 Mode 2027
 
 ## Status
 

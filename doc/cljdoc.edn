@@ -1,0 +1,27 @@
+{:cljdoc.doc/tree
+ [["Getting Started" {:file "doc/guides/getting-started.md"}]
+  ["Components" {:file "doc/components/overview.md"}
+   ["Spinner" {:file "doc/components/spinner.md"}]
+   ["Text Input" {:file "doc/components/text-input.md"}]
+   ["List" {:file "doc/components/list.md"}]
+   ["Paginator" {:file "doc/components/paginator.md"}]
+   ["Timer" {:file "doc/components/timer.md"}]
+   ["Progress" {:file "doc/components/progress.md"}]
+   ["Help" {:file "doc/components/help.md"}]]
+  ["API Reference" {}
+   ["Program" {:file "doc/api/program.md"}]
+   ["Messages" {:file "doc/api/messages.md"}]
+   ["Styling" {:file "doc/api/styling.md"}]
+   ["Layout" {:file "doc/api/layout.md"}]]
+  ["Guides" {}
+   ["Component Composition" {:file "doc/guides/component-composition.md"}]
+   ["Styling Patterns" {:file "doc/guides/styling-patterns.md"}]]
+  ["Examples" {:file "doc/examples/README.md"}]
+  ["Architecture Decision Records" {}
+   ["ADR 001: BreakIterator ICU4J vs JDK" {:file "doc/adr/001-breakiterator-icu4j-vs-jdk.md"}]
+   ["ADR 002: JLine FFM vs JNI" {:file "doc/adr/002-jline-ffm-vs-jni.md"}]
+   ["ADR 003: Testing Strategy" {:file "doc/adr/003-testing-strategy.md"}]
+   ["ADR 004: JLine Input API Choices" {:file "doc/adr/004-jline-input-api-choices.md"}]
+   ["ADR 005: Layout Primitives" {:file "doc/adr/005-layout-primitives.md"}]
+   ["ADR 006: Remove charm.core Facade" {:file "doc/adr/006-remove-charm-core-facade.md"}]
+   ["ADR 007: Grapheme Cluster Width" {:file "doc/adr/007-grapheme-cluster-width.md"}]]]}

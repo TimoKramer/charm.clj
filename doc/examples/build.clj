@@ -1,7 +1,7 @@
 (ns build
   "Build script for timer CLI app.
 
-   Usage (from docs/examples directory):
+   Usage (from doc/examples directory):
      clj -T:build clean
      clj -T:build uber
      clj -T:build all    ; clean + uber"

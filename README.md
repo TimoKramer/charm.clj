@@ -1,7 +1,8 @@
 # charm.clj
 
-![Status](https://img.shields.io/badge/status-alpha-orange)
+![Status](https://img.shields.io/badge/status-beta-blue)
 [![Clojars Project](https://img.shields.io/clojars/v/de.timokramer/charm.clj.svg)](https://clojars.org/de.timokramer/charm.clj)
+[![GitHub tag](https://img.shields.io/github/v/tag/TimoKramer/charm.clj?label=git%20tag)](https://github.com/TimoKramer/charm.clj/tags)
 
 A Clojure TUI (Terminal User Interface) library inspired by [Bubble Tea](https://github.com/charmbracelet/bubbletea).
 
@@ -10,13 +11,13 @@ on the JVM, as a native-image binary or on [babashka](https://babashka.org).
 
 ## Status
 
-This library is vibecoded and very early. It works for the examples but please let me know if you encounter any
-issues. I am planning to use it for something more sophisticated. Please expect breaking changes.
+This library is in beta. The API is stabilizing but breaking changes may still occur. Please let me know if you
+encounter any issues.
 
 ## Features
 
 - **Elm Architecture** - Simple init/update/view pattern for predictable state management
-- **UI Components** - Spinner, text-input, list, paginator, timer, progress, help
+- **UI Components** - Spinner, text-input, list, paginator, timer, progress, help, viewport, table
 - **Styling** - Colors (ANSI, 256, true color), borders, padding, alignment
 - **Input handling** - Keyboard and mouse events with modifier support
 - **Efficient rendering** - Line diffing for minimal terminal updates
@@ -24,30 +25,33 @@ issues. I am planning to use it for something more sophisticated. Please expect 
 
 ## Documentation
 
-- **[Getting Started](docs/guides/getting-started.md)** - Build your first app
-- **[Components](docs/components/overview.md)** - UI component reference
-  - [spinner](docs/components/spinner.md), [text-input](docs/components/text-input.md), [list](docs/components/list.md), [paginator](docs/components/paginator.md), [timer](docs/components/timer.md), [progress](docs/components/progress.md), [help](docs/components/help.md)
+- **[Getting Started](doc/guides/getting-started.md)** - Build your first app
+- **[Components](doc/components/overview.md)** - UI component reference
+  - [spinner](doc/components/spinner.md), [text-input](doc/components/text-input.md), [list](doc/components/list.md), [paginator](doc/components/paginator.md), [timer](doc/components/timer.md), [progress](doc/components/progress.md), [help](doc/components/help.md)
 - **API Reference**
-  - [Program](docs/api/program.md) - run, cmd, batch, quit-cmd
-  - [Messages](docs/api/messages.md) - key-press, mouse, window-size
-  - [Styling](docs/api/styling.md) - style, render, colors, borders
-  - [Layout](docs/api/layout.md) - join-horizontal, join-vertical
+  - [Program](doc/api/program.md) - run, cmd, batch, quit-cmd
+  - [Messages](doc/api/messages.md) - key-press, mouse, window-size
+  - [Styling](doc/api/styling.md) - style, render, colors, borders
+  - [Layout](doc/api/layout.md) - join-horizontal, join-vertical
 - **Guides**
-  - [Component Composition](docs/guides/component-composition.md)
-  - [Styling Patterns](docs/guides/styling-patterns.md)
-- **[Examples](docs/examples/README.md)** - Runnable demo applications
+  - [Component Composition](doc/guides/component-composition.md)
+  - [Styling Patterns](doc/guides/styling-patterns.md)
+- **[Examples](doc/examples/README.md)** - Runnable demo applications
 
 ## Installation
 
-Add to your `deps.edn`:
+Add to your `deps.edn`. Click the badges to find the latest version and git tag:
 
-via github
+[![Clojars](https://img.shields.io/clojars/v/de.timokramer/charm.clj.svg)](https://clojars.org/de.timokramer/charm.clj)
+
 ```clojure
-{:deps {io.github.timokramer/charm.clj {:git/tag "v0.1.64" :git/sha "e5120a9"}}}
+{:deps {de.timokramer/charm.clj {:mvn/version "VERSION"}}}
 ```
-or via clojars maven repository
+
+[![GitHub tag](https://img.shields.io/github/v/tag/TimoKramer/charm.clj)](https://github.com/TimoKramer/charm.clj/tags)
+
 ```clojure
-{:deps {de.timokramer/charm.clj {:mvn/version "0.1.64"}}}
+{:deps {io.github.timokramer/charm.clj {:git/tag "TAG" :git/sha "SHA"}}}
 ```
 
 
@@ -175,7 +179,7 @@ program/quit-cmd
 
 ## Examples
 
-Please take a look at the [examples](docs/examples/README.md) in the docs folder and don't hesitate to contribute your examples please.
+Please take a look at the [examples](doc/examples/README.md) in the doc folder and don't hesitate to contribute your examples please.
 
 ## Project Structure
 

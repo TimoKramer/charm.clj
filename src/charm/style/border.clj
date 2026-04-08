@@ -4,7 +4,7 @@
    Provides predefined border styles and functions for
    rendering borders around text content."
   (:require [charm.ansi.width :as w]
-            [charm.style.color :as color]
+            [charm.style.color :as c]
             [clojure.string :as str]))
 
 ;; ---------------------------------------------------------------------------
@@ -106,7 +106,7 @@
 (defn- style-text
   "Apply foreground and background color to text."
   [text fg bg]
-  (color/styled-str text :fg fg :bg bg))
+  (c/styled-str text :fg fg :bg bg))
 
 (defn apply-border
   "Apply a border around text content.

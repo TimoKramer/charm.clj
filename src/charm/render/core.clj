@@ -1,4 +1,4 @@
-(ns charm.render.core
+(ns ^:no-doc charm.render.core
   "Terminal renderer using JLine's Display for efficient diffing.
 
    Provides a high-level rendering API that efficiently updates

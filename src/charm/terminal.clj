@@ -1,4 +1,4 @@
-(ns charm.terminal
+(ns ^:no-doc charm.terminal
   "JLine terminal wrapper for charm.clj"
   (:import [org.jline.terminal Terminal TerminalBuilder Attributes]
            [org.jline.utils InfoCmp$Capability]))

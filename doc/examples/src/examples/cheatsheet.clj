@@ -4,7 +4,7 @@
    All sections are shown at once. Typing filters inline, showing only
    matching functions. Enter opens an overlay with documentation.
 
-   Run: cd docs/examples && clj -M -m examples.cheatsheet"
+   Run: cd doc/examples && clj -M -m examples.cheatsheet"
   (:require
    [charm.ansi.width :as ansi-width]
    [charm.components.help :as help]
