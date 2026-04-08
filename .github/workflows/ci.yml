@@ -52,8 +52,8 @@ jobs:
         run: |
           sudo apt-get -qq update
           sudo apt-get -qq install -y ffmpeg ttyd
-          go install github.com/charmbracelet/vhs@v0.10.0
-          cd docs/examples/
+          go install github.com/charmbracelet/vhs@v0.11.0
+          cd doc/examples/
           ${HOME}/go/bin/vhs vhs/pomodoro.tape
           ${HOME}/go/bin/vhs vhs/download.tape
 
