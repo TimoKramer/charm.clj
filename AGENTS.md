@@ -66,7 +66,7 @@ clojure -M -m examples.file-browser
 
 ## Running Tests via REPL
 
-See [ADR 003: Testing Strategy](docs/adr/003-testing-strategy.md) for the full decision record.
+See [ADR 003: Testing Strategy](doc/adr/003-testing-strategy.md) for the full decision record.
 
 ## Three-Tier Testing Strategy
 

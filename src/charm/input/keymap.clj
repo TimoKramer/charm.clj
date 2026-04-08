@@ -1,4 +1,4 @@
-(ns charm.input.keymap
+(ns ^:no-doc charm.input.keymap
   "JLine KeyMap-based escape sequence handling.
 
    Uses JLine's KeyMap for efficient O(1) escape sequence lookup

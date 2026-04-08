@@ -1,4 +1,4 @@
-(ns charm.render.screen
+(ns ^:no-doc charm.render.screen
   "ANSI control sequences for terminal features without JLine capability equivalents.
 
    For cursor movement, screen clearing, and alt screen, use charm.terminal

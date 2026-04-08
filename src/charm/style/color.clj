@@ -1,4 +1,4 @@
-(ns charm.style.color
+(ns ^:no-doc charm.style.color
   "Terminal color handling.
 
    Supports:

@@ -1,7 +1,7 @@
-(ns charm.style.layout
+(ns ^:no-doc charm.style.layout
   "Layout utilities: padding, margin, alignment, and joining."
   (:require [charm.ansi.width :as w]
-            [charm.style.color :as color]
+            [charm.style.color :as c]
             [clojure.string :as str]))
 
 ;; ---------------------------------------------------------------------------
@@ -59,7 +59,7 @@
   [n bg]
   (let [spaces (apply str (repeat n " "))]
     (if bg
-      (color/styled-str spaces :bg bg)
+      (c/styled-str spaces :bg bg)
       spaces)))
 
 ;; ---------------------------------------------------------------------------
