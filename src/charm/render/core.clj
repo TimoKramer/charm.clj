@@ -28,6 +28,7 @@
            :display display
            :fps fps
            :alt-screen alt-screen
+           :in-alt-screen false
            :hide-cursor hide-cursor
            :width width
            :height height
@@ -71,19 +72,19 @@
 (defn enter-alt-screen!
   "Enter the alternate screen buffer."
   [renderer]
-  (when-not (:alt-screen @renderer)
+  (when-not (:in-alt-screen @renderer)
     (let [terminal (:terminal @renderer)]
       (term/enter-alt-screen terminal)
+      (swap! renderer assoc :in-alt-screen true)
       (term/clear-screen terminal)
-      (term/cursor-home terminal))
-    (swap! renderer assoc :alt-screen true)))
+      (term/cursor-home terminal))))
 
 (defn exit-alt-screen!
   "Exit the alternate screen buffer."
   [renderer]
-  (when (:alt-screen @renderer)
+  (when (:in-alt-screen @renderer)
     (term/exit-alt-screen (:terminal @renderer))
-    (swap! renderer assoc :alt-screen false)))
+    (swap! renderer assoc :in-alt-screen false)))
 
 (defn clear-screen!
   "Clear the screen."
@@ -236,8 +237,8 @@
 (defn stop!
   "Stop the renderer and restore terminal state."
   [renderer]
-  (let [{:keys [alt-screen hide-cursor]} @renderer]
-    (when alt-screen
+  (let [{:keys [in-alt-screen hide-cursor]} @renderer]
+    (when in-alt-screen
       (exit-alt-screen! renderer))
     (when hide-cursor
       (show-cursor! renderer))

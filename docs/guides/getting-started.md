@@ -27,7 +27,9 @@ Create `src/counter/core.clj`:
 
 ```clojure
 (ns counter.core
-  (:require [charm.core :as charm]))
+  (:require
+   [charm.message :as msg]
+   [charm.program :as program]))
 
 (defn init []
   [{:count 0} nil])
@@ -39,9 +41,9 @@ Create `src/counter/core.clj`:
   (str "Count: " (:count state)))
 
 (defn -main [& _args]
-  (charm/run {:init init
-              :update update-fn
-              :view view}))
+  (program/run {:init init
+                :update update-fn
+                :view view}))
 ```
 
 Run it:
@@ -60,17 +62,17 @@ Add key handling to the update function:
 (defn update-fn [state msg]
   (cond
     ;; Quit on 'q'
-    (charm/key-match? msg "q")
-    [state charm/quit-cmd]
+    (msg/key-match? msg "q")
+    [state program/quit-cmd]
 
     ;; Increment on up arrow or 'k'
-    (or (charm/key-match? msg :up)
-        (charm/key-match? msg "k"))
+    (or (msg/key-match? msg :up)
+        (msg/key-match? msg "k"))
     [(update state :count inc) nil]
 
     ;; Decrement on down arrow or 'j'
-    (or (charm/key-match? msg :down)
-        (charm/key-match? msg "j"))
+    (or (msg/key-match? msg :down)
+        (msg/key-match? msg "j"))
     [(update state :count dec) nil]
 
     ;; Ignore other input
@@ -96,22 +98,29 @@ Add instructions and styling:
 Make it visually appealing:
 
 ```clojure
+(ns counter.core
+  (:require
+   [charm.message :as msg]
+   [charm.program :as program]
+   [charm.style.border :as border]
+   [charm.style.core :as style]))
+
 (def title-style
-  (charm/style :fg charm/cyan :bold true))
+  (style/style :fg style/cyan :bold true))
 
 (def count-style
-  (charm/style :fg charm/yellow
+  (style/style :fg style/yellow
                :bold true
                :padding [1 3]
-               :border charm/rounded-border))
+               :border border/rounded))
 
 (def help-style
-  (charm/style :fg 240))  ; Gray
+  (style/style :fg 240))  ; Gray
 
 (defn view [state]
-  (str (charm/render title-style "Counter App") "\n\n"
-       (charm/render count-style (str (:count state))) "\n\n"
-       (charm/render help-style "Up/k: +1  Down/j: -1  q: quit")))
+  (str (style/render title-style "Counter App") "\n\n"
+       (style/render count-style (str (:count state))) "\n\n"
+       (style/render help-style "Up/k: +1  Down/j: -1  q: quit")))
 ```
 
 ### Step 5: Use Alternate Screen
@@ -120,57 +129,61 @@ For a cleaner experience, use the alternate screen buffer:
 
 ```clojure
 (defn -main [& _args]
-  (charm/run {:init init
-              :update update-fn
-              :view view
-              :alt-screen true}))
+  (program/run {:init init
+                :update update-fn
+                :view view
+                :alt-screen true}))
 ```
 
 ## Complete Counter App
 
 ```clojure
 (ns counter.core
-  (:require [charm.core :as charm]))
+  (:require
+   [charm.message :as msg]
+   [charm.program :as program]
+   [charm.style.border :as border]
+   [charm.style.core :as style]))
 
 (def title-style
-  (charm/style :fg charm/cyan :bold true))
+  (style/style :fg style/cyan :bold true))
 
 (def count-style
-  (charm/style :fg charm/yellow
+  (style/style :fg style/yellow
                :bold true
                :padding [1 3]
-               :border charm/rounded-border))
+               :border border/rounded))
 
 (def help-style
-  (charm/style :fg 240))
+  (style/style :fg 240))
 
 (defn init []
   [{:count 0} nil])
 
 (defn update-fn [state msg]
   (cond
-    (charm/key-match? msg "q")
-    [state charm/quit-cmd]
+    (msg/key-match? msg "q")
+    [state program/quit-cmd]
 
-    (or (charm/key-match? msg :up) (charm/key-match? msg "k"))
+    (or (msg/key-match? msg :up) (msg/key-match? msg "k"))
     [(update state :count inc) nil]
 
-    (or (charm/key-match? msg :down) (charm/key-match? msg "j"))
+    (or (msg/key-match? msg :down) (msg/key-match? msg "j"))
     [(update state :count dec) nil]
 
     :else
     [state nil]))
 
 (defn view [state]
-  (str (charm/render title-style "Counter App") "\n\n"
-       (charm/render count-style (str (:count state))) "\n\n"
-       (charm/render help-style "Up/k: +1  Down/j: -1  q: quit")))
+  (str (style/render title-style "Counter App") "\n\n"
+       (style/render count-style (str (:count state))) "\n\n"
+       (style/render help-style "Up/k: +1  Down/j: -1  q: quit")))
 
 (defn -main [& _args]
-  (charm/run {:init init
-              :update update-fn
-              :view view
-              :alt-screen true}))
+  (program/run {:init init
+                :update update-fn
+                :view view
+                :alt-screen true}))
 ```
 
 ## Understanding the Elm Architecture
@@ -206,33 +219,36 @@ Let's add a spinner to show loading state.
 
 ```clojure
 (ns loader.core
-  (:require [charm.core :as charm]))
+  (:require
+   [charm.components.spinner :as spinner]
+   [charm.message :as msg]
+   [charm.program :as program]))
 
 (defn init []
-  (let [[spinner cmd] (charm/spinner-init (charm/spinner :dots))]
-    [{:spinner spinner
+  (let [[s cmd] (spinner/spinner-init (spinner/spinner :dots))]
+    [{:spinner s
       :loading true}
      cmd]))
 
 (defn update-fn [state msg]
   (cond
-    (charm/key-match? msg "q")
-    [state charm/quit-cmd]
+    (msg/key-match? msg "q")
+    [state program/quit-cmd]
 
     ;; Pass spinner ticks to the spinner
     :else
-    (let [[spinner cmd] (charm/spinner-update (:spinner state) msg)]
-      [(assoc state :spinner spinner) cmd])))
+    (let [[s cmd] (spinner/spinner-update (:spinner state) msg)]
+      [(assoc state :spinner s) cmd])))
 
 (defn view [state]
-  (str (charm/spinner-view (:spinner state))
+  (str (spinner/spinner-view (:spinner state))
        " Loading..."))
 
 (defn -main [& _args]
-  (charm/run {:init init
-              :update update-fn
-              :view view
-              :alt-screen true}))
+  (program/run {:init init
+                :update update-fn
+                :view view
+                :alt-screen true}))
 ```
 
 ## Next Steps

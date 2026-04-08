@@ -7,8 +7,13 @@
      clj -M:timer 1h30m        # 1 hour 30 minutes
      clj -M:timer 90           # 90 seconds (default unit)
      clj -M:timer -n \"Tea\" 3m  # Named timer"
-  (:require [charm.core :as charm]
-            [clojure.string :as str])
+  (:require
+   [charm.components.progress :as progress]
+   [charm.components.timer :as timer]
+   [charm.message :as msg]
+   [charm.program :as program]
+   [charm.style.core :as style]
+   [clojure.string :as str])
   (:gen-class))
 
 ;; ---------------------------------------------------------------------------
@@ -87,42 +92,42 @@
 ;; ---------------------------------------------------------------------------
 
 (def name-style
-  (charm/style :fg (charm/rgb 180 140 255) :bold true))
+  (style/style :fg (style/rgb 180 140 255) :bold true))
 
 (def time-style
-  (charm/style :fg (charm/rgb 140 140 140)))
+  (style/style :fg (style/rgb 140 140 140)))
 
 (defn gradient-color
   "Interpolate from cyan to magenta based on progress.
    When dim? is true, returns a darker version."
-  ([progress] (gradient-color progress false))
-  ([progress dim?]
-   (let [p (double progress)
+  ([p] (gradient-color p false))
+  ([p dim?]
+   (let [p (double p)
          ;; Start: cyan (0, 220, 255) -> End: magenta (255, 100, 255)
          r (+ 0 (* p 255))
          g (- 220 (* p 120))
          b 255
          ;; Apply dimming factor (0.3 = 30% brightness)
          factor (if dim? 0.8 1.0)]
-     (charm/rgb (int (* r factor))
+     (style/rgb (int (* r factor))
                 (int (* g factor))
                 (int (* b factor))))))
 
 (defn view [state]
   (let [{:keys [name timer total-ms]} state
-        remaining (max 0 (charm/timer-timeout timer))
+        remaining (max 0 (timer/timeout timer))
         elapsed (- total-ms remaining)
-        progress (if (pos? total-ms) (/ elapsed total-ms) 0.0)
-        bar (charm/progress-bar :width 30
-                                :percent progress
-                                :bar-style :thick
-                                :full-style (charm/style :fg (gradient-color progress))
-                                :empty-style (charm/style :fg (gradient-color progress true)))]
+        p (if (pos? total-ms) (/ elapsed total-ms) 0.0)
+        bar (progress/progress-bar :width 30
+                                   :percent p
+                                   :bar-style :thick
+                                   :full-style (style/style :fg (gradient-color p))
+                                   :empty-style (style/style :fg (gradient-color p true)))]
     (str (when name
-           (str (charm/render name-style name) "\n"))
-         (charm/progress-view bar)
+           (str (style/render name-style name) "\n"))
+         (progress/progress-view bar)
          "  "
-         (charm/render time-style (format-remaining remaining)))))
+         (style/render time-style (format-remaining remaining)))))
 
 ;; ---------------------------------------------------------------------------
 ;; Update
@@ -131,18 +136,18 @@
 (defn update-fn [state msg]
   (cond
     ;; Quit on q or Ctrl+C
-    (or (charm/key-match? msg "q")
-        (charm/key-match? msg "ctrl+c")
-        (charm/key-match? msg "esc"))
-    [state charm/quit-cmd]
+    (or (msg/key-match? msg "q")
+        (msg/key-match? msg "ctrl+c")
+        (msg/key-match? msg "esc"))
+    [state program/quit-cmd]
 
     ;; Timer tick
     :else
-    (let [[new-timer cmd] (charm/timer-update (:timer state) msg)
+    (let [[new-timer cmd] (timer/timer-update (:timer state) msg)
           new-state (assoc state :timer new-timer)]
       ;; Auto-quit when timer completes
-      (if (charm/timer-timed-out? new-timer)
-        [new-state charm/quit-cmd]
+      (if (timer/timed-out? new-timer)
+        [new-state program/quit-cmd]
         [new-state cmd]))))
 
 ;; ---------------------------------------------------------------------------
@@ -151,12 +156,12 @@
 
 (defn init [opts]
   (fn []
-    (let [timer (charm/timer :timeout (:duration-ms opts)
-                             :interval 100
-                             :running true)
-          [timer cmd] (charm/timer-init timer)]
+    (let [t (timer/timer :timeout (:duration-ms opts)
+                         :interval 100
+                         :running true)
+          [t cmd] (timer/timer-init t)]
       [{:name (:name opts)
-        :timer timer
+        :timer t
         :total-ms (:duration-ms opts)}
        cmd])))
 
@@ -192,9 +197,9 @@
           (usage)
           (System/exit 1))
         (do
-          (charm/run {:init (init opts)
-                      :update update-fn
-                      :view view
-                      :alt-screen false
-                      :hide-cursor true})
+          (program/run {:init (init opts)
+                        :update update-fn
+                        :view view
+                        :alt-screen false
+                        :hide-cursor true})
           (println))))))  ; Newline after progress bar

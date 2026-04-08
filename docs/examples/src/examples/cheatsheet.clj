@@ -8,8 +8,10 @@
   (:require
    [charm.ansi.width :as ansi-width]
    [charm.components.help :as help]
+   [charm.components.text-input :as text-input]
    [charm.components.viewport :as viewport]
-   [charm.core :as charm]
+   [charm.message :as msg]
+   [charm.program :as program]
    [charm.style.border :as border]
    [charm.style.core :as style]
    [charm.style.overlay :as overlay]
@@ -30,34 +32,34 @@
 ;; ---------------------------------------------------------------------------
 
 (def title-style
-  (charm/style :fg clj-green :bold true))
+  (style/style :fg clj-green :bold true))
 
 (def section-rule-style
-  (charm/style :fg 240))
+  (style/style :fg 240))
 
 (def subsection-title-style
-  (charm/style :fg clj-blue :bold true))
+  (style/style :fg clj-blue :bold true))
 
 (def group-label-style
-  (charm/style :fg 240))
+  (style/style :fg 240))
 
 (def fn-selected-style
-  (charm/style :fg :black :bg clj-light-green :bold true))
+  (style/style :fg :black :bg clj-light-green :bold true))
 
 (def overlay-title-style
-  (charm/style :fg clj-blue :bold true))
+  (style/style :fg clj-blue :bold true))
 
 (def overlay-arglists-style
-  (charm/style :fg clj-green))
+  (style/style :fg clj-green))
 
 (def overlay-section-rule-style
-  (charm/style :fg 240))
+  (style/style :fg 240))
 
 (def overlay-seealso-style
-  (charm/style :fg clj-blue))
+  (style/style :fg clj-blue))
 
 (def dim-style
-  (charm/style :fg 240))
+  (style/style :fg 240))
 
 ;; ---------------------------------------------------------------------------
 ;; Helpers
@@ -89,7 +91,7 @@
         prefix-width (ansi-width/string-width prefix)
         fill-width (max 0 (- width prefix-width))
         fill (apply str (repeat fill-width "─"))]
-    (charm/render section-rule-style (str prefix fill))))
+    (style/render section-rule-style (str prefix fill))))
 
 (defn- overlay-section-rule
   "Render an overlay section divider ── Title ─────"
@@ -98,7 +100,7 @@
         prefix-width (count prefix)
         fill-width (max 0 (- width prefix-width))
         fill (apply str (repeat fill-width "─"))]
-    (charm/render overlay-section-rule-style (str prefix fill))))
+    (style/render overlay-section-rule-style (str prefix fill))))
 
 ;; ---------------------------------------------------------------------------
 ;; State Initialization
@@ -119,27 +121,27 @@
 
 (defn init []
   (let [state {:mode :browse
-               :filter-input (charm/text-input :prompt ""
-                                               :placeholder "filter..."
-                                               :focused false)
+               :filter-input (text-input/text-input :prompt ""
+                                                    :placeholder "filter..."
+                                                    :focused false)
                :filter-focused false
                :cursor {:row 0 :col 0}
                :scroll-offset 0
                :overlay {:fn-sym nil
-                         :viewport (charm/viewport "" :height 20)
+                         :viewport (viewport/viewport "" :height 20)
                          :see-alsos []
                          :see-also-idx 0}
                :help (make-help :browse false)
                :width 80
                :height 24}]
-    [state (charm/cmd data/load-docs!)]))
+    [state (program/cmd data/load-docs!)]))
 
 ;; ---------------------------------------------------------------------------
 ;; Computed Values
 ;; ---------------------------------------------------------------------------
 
 (defn- current-query [state]
-  (charm/text-input-value (:filter-input state)))
+  (text-input/value (:filter-input state)))
 
 (defn- filtered-sections [state]
   (data/filter-sections data/sections (current-query state)))
@@ -183,7 +185,7 @@
       (when-let [arglists (:arglists doc-data)]
         (concat
          (for [args arglists]
-           (charm/render overlay-arglists-style
+           (style/render overlay-arglists-style
                          (str "  (" n " " args ")")))
          [""]))
       ;; Docstring
@@ -208,7 +210,7 @@
          ""
          (str/join "  "
                    (map (fn [kw]
-                          (charm/render overlay-seealso-style (name kw)))
+                          (style/render overlay-seealso-style (name kw)))
                         (take 12 see-alsos)))])
       ;; Fallback
       (when (nil? doc-data)
@@ -230,9 +232,9 @@
     (-> state
         (assoc :mode :overlay)
         (assoc :overlay {:fn-sym fn-sym
-                         :viewport (charm/viewport content
-                                                   :height overlay-height
-                                                   :width content-width)
+                         :viewport (viewport/viewport content
+                                                      :height overlay-height
+                                                      :width content-width)
                          :see-alsos see-alsos
                          :see-also-idx 0})
         (assoc :help (make-help :overlay false)))))
@@ -297,18 +299,18 @@
 (defn- focus-filter [state]
   (-> state
       (assoc :filter-focused true)
-      (update :filter-input charm/text-input-focus)
+      (update :filter-input text-input/focus)
       (assoc :help (make-help :browse true))))
 
 (defn- blur-filter [state]
   (-> state
       (assoc :filter-focused false)
-      (update :filter-input charm/text-input-blur)
+      (update :filter-input text-input/blur)
       (assoc :help (make-help :browse false))))
 
 (defn- clear-and-blur-filter [state]
   (-> state
-      (update :filter-input charm/text-input-reset)
+      (update :filter-input text-input/reset)
       (blur-filter)
       (assoc :cursor {:row 0 :col 0})
       (assoc :scroll-offset 0)))
@@ -337,7 +339,7 @@
   (tap> {:update-state state :update-msg msg})
   (cond
     ;; Window resize
-    (charm/window-size? msg)
+    (msg/window-size? msg)
     [(-> state
          (assoc :width (:width msg))
          (assoc :height (:height msg))
@@ -345,8 +347,8 @@
      nil]
 
     ;; Global quit
-    (charm/key-match? msg "ctrl+c")
-    [state charm/quit-cmd]
+    (msg/key-match? msg "ctrl+c")
+    [state program/quit-cmd]
 
     :else
     (case (:mode state)
@@ -354,42 +356,42 @@
       :browse
       (cond
         ;; Vertical navigation: up/down moves between groups
-        (or (charm/key-match? msg "down") (and (not (:filter-focused state)) (charm/key-match? msg "j")))
+        (or (msg/key-match? msg "down") (and (not (:filter-focused state)) (msg/key-match? msg "j")))
         [(adjust-scroll (move-row state 1)) nil]
 
-        (or (charm/key-match? msg "up") (and (not (:filter-focused state)) (charm/key-match? msg "k")))
+        (or (msg/key-match? msg "up") (and (not (:filter-focused state)) (msg/key-match? msg "k")))
         [(adjust-scroll (move-row state -1)) nil]
 
         ;; Horizontal navigation: left/right moves between fns within a group
-        (or (charm/key-match? msg "left") (and (not (:filter-focused state)) (charm/key-match? msg "h")))
+        (or (msg/key-match? msg "left") (and (not (:filter-focused state)) (msg/key-match? msg "h")))
         [(adjust-scroll (move-col state -1)) nil]
 
-        (or (charm/key-match? msg "right") (and (not (:filter-focused state)) (charm/key-match? msg "l")))
+        (or (msg/key-match? msg "right") (and (not (:filter-focused state)) (msg/key-match? msg "l")))
         [(adjust-scroll (move-col state 1)) nil]
 
         ;; Enter opens overlay
-        (charm/key-match? msg "enter")
+        (msg/key-match? msg "enter")
         (if-let [sym (cursor-sym state)]
           [(open-overlay state sym) nil]
           [state nil])
 
         ;; Escape clears filter and blurs
-        (charm/key-match? msg "escape")
+        (msg/key-match? msg "escape")
         (if (:filter-focused state)
           [(clear-and-blur-filter state) nil]
           [state nil])
 
         ;; / focuses filter (when blurred)
-        (and (not (:filter-focused state)) (charm/key-match? msg "/"))
+        (and (not (:filter-focused state)) (msg/key-match? msg "/"))
         [(focus-filter state) nil]
 
         ;; q quits (when blurred)
-        (and (not (:filter-focused state)) (charm/key-match? msg "q"))
-        [state charm/quit-cmd]
+        (and (not (:filter-focused state)) (msg/key-match? msg "q"))
+        [state program/quit-cmd]
 
         ;; When focused, pass typing to text-input
         (:filter-focused state)
-        (let [[new-input cmd] (charm/text-input-update (:filter-input state) msg)
+        (let [[new-input cmd] (text-input/text-input-update (:filter-input state) msg)
               state (assoc state :filter-input new-input)
               ;; Reset cursor when filter changes
               state (-> state (assoc :cursor {:row 0 :col 0}) (assoc :scroll-offset 0))
@@ -402,19 +404,19 @@
       ;; ----- Overlay mode -----
       :overlay
       (cond
-        (charm/key-match? msg "escape")
+        (msg/key-match? msg "escape")
         [(close-overlay state) nil]
 
-        (or (charm/key-match? msg "down") (charm/key-match? msg "j")
-            (charm/key-match? msg "up") (charm/key-match? msg "k")
-            (charm/key-match? msg "ctrl+d") (charm/key-match? msg "ctrl+u"))
+        (or (msg/key-match? msg "down") (msg/key-match? msg "j")
+            (msg/key-match? msg "up") (msg/key-match? msg "k")
+            (msg/key-match? msg "ctrl+d") (msg/key-match? msg "ctrl+u"))
         (let [[vp _] (viewport/viewport-update (get-in state [:overlay :viewport]) msg)]
           [(assoc-in state [:overlay :viewport] vp) nil])
 
-        ; (charm/key-match? msg "n")
+        ; (msg/key-match? msg "n")
         ; [(next-see-also state) nil]
         ;
-        ; (charm/key-match? msg "p")
+        ; (msg/key-match? msg "p")
         ; [(prev-see-also state) nil]
 
         :else
@@ -428,7 +430,7 @@
   "Word-wrap a group's fns into lines.
    Returns {:lines [str ...] :cursor-line <int-or-nil>}."
   [{:keys [label fns]} label-width selected? col width line-offset]
-  (let [label-str (charm/render group-label-style (ansi-width/pad-right label label-width))
+  (let [label-str (style/render group-label-style (ansi-width/pad-right label label-width))
         prefix (str "    " label-str "  ")
         prefix-w (ansi-width/string-width prefix)
         indent (apply str (repeat prefix-w " "))]
@@ -438,7 +440,7 @@
       (if-let [[fi sym] (first remaining)]
         (let [sel? (and selected? (= fi col))
               text (if sel?
-                     (charm/render fn-selected-style (name sym))
+                     (style/render fn-selected-style (name sym))
                      (name sym))
               tw (ansi-width/string-width text)
               start? (= w prefix-w)
@@ -481,7 +483,7 @@
               :gap     (update acc :lines conj "")
               :rule    (update acc :lines conj (section-rule (first args) width))
               :heading (update acc :lines conj
-                               (str "  " (charm/render subsection-title-style (first args))))
+                               (str "  " (style/render subsection-title-style (first args))))
               :group   (let [[group lw] args
                              result (render-group-fns group lw (= (:gi acc) row) col
                                                       width (count (:lines acc)))]
@@ -492,15 +494,15 @@
           {:lines [] :cursor-line 0 :gi 0}
           items)]
     (if (empty? lines)
-      {:text (charm/render dim-style "  No matching functions") :cursor-line 0}
+      {:text (style/render dim-style "  No matching functions") :cursor-line 0}
       {:text (str/join "\n" lines) :cursor-line cursor-line})))
 
 (def filter-field-width 30)
 
 (defn- render-filter-bar [state]
-  (let [input-view (charm/text-input-view (:filter-input state))
+  (let [input-view (text-input/text-input-view (:filter-input state))
         field-content (str "🔍 " input-view)]
-    (charm/render (charm/style :bg clj-light-blue
+    (style/render (style/style :bg clj-light-blue
                                :width filter-field-width
                                :border border/inner-half-block
                                :border-fg clj-light-blue
@@ -508,7 +510,7 @@
                   field-content)))
 
 (defn- render-title-bar [state]
-  (let [title (charm/render title-style "Clojure Cheatsheet")
+  (let [title (style/render title-style "Clojure Cheatsheet")
         filter-bar (render-filter-bar state)
         filter-lines (str/split-lines filter-bar)
         ;; Filter field width including padding
@@ -546,7 +548,7 @@
   (let [{:keys [fn-sym viewport]} (:overlay state)
         title (str " " (namespace fn-sym) "/" (name fn-sym) " ")
         content (viewport/viewport-view viewport)
-        bordered (charm/render (charm/style :border border/rounded
+        bordered (style/render (style/style :border border/rounded
                                             :border-fg clj-blue
                                             :padding [0 1])
                                content)
@@ -555,14 +557,14 @@
         top-line (first bordered-lines)
         top-width (ansi-width/string-width top-line)
         ;; Build new top line with title embedded
-        title-styled (charm/render overlay-title-style title)
+        title-styled (style/render overlay-title-style title)
         corner-l "╭─"
         corner-r (let [title-area-width (ansi-width/string-width (str corner-l title))
                        remaining (max 0 (- top-width title-area-width 1))]
                    (str (apply str (repeat remaining "─")) "╮"))
-        new-top (str (charm/render (charm/style :fg clj-blue) corner-l)
+        new-top (str (style/render (style/style :fg clj-blue) corner-l)
                      title-styled
-                     (charm/render (charm/style :fg clj-blue) corner-r))
+                     (style/render (style/style :fg clj-blue) corner-r))
         final-lines (assoc (vec bordered-lines) 0 new-top)]
     (str/join "\n" final-lines)))
 
@@ -605,7 +607,7 @@
                         content-str "\n\n"
                         help-bar)
         ;; Wrap in thick border, filling the terminal width
-        base-view (charm/render (charm/style :border border/thick
+        base-view (style/render (style/style :border border/thick
                                              :border-fg clj-blue
                                              :width (- width 2))
                                 inner-view)]
@@ -630,14 +632,14 @@
   ;    {:quit!  (fn [] ...) - stop the app
   ;     :result (promise)   - deref to get the final state}"
   ; []
-  (def app (charm/run-async {:init init
-                             :update update-fn
-                             :view view
-                             :alt-screen true}))
+  (def app (program/run-async {:init init
+                               :update update-fn
+                               :view view
+                               :alt-screen true}))
   ((:quit! app)))
 
 (defn -main [& _args]
-  (charm/run {:init init
-              :update update-fn
-              :view view
-              :alt-screen true}))
+  (program/run {:init init
+                :update update-fn
+                :view view
+                :alt-screen true}))

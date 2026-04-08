@@ -5,28 +5,28 @@ Countdown timer component with start/stop controls and formatted display.
 ## Quick Example
 
 ```clojure
-(require '[charm.core :as charm])
+(require '[charm.components.timer :as timer])
 
-(def my-timer (charm/timer :timeout 60000))  ; 60 seconds
+(def my-timer (timer/timer :timeout 60000))  ; 60 seconds
 
 ;; Initialize to start countdown
-(let [[timer cmd] (charm/timer-init my-timer)]
-  ;; timer is ready, cmd starts the tick loop
+(let [[t cmd] (timer/timer-init my-timer)]
+  ;; t is ready, cmd starts the tick loop
   )
 
 ;; In update function
-(let [[timer cmd] (charm/timer-update timer msg)]
+(let [[t cmd] (timer/timer-update t msg)]
   ;; Handle timer ticks
   )
 
 ;; In view function
-(charm/timer-view timer)  ; => "1:00"
+(timer/timer-view t)  ; => "1:00"
 ```
 
 ## Creation Options
 
 ```clojure
-(charm/timer & options)
+(timer/timer & options)
 ```
 
 | Option | Type | Default | Description |
@@ -42,7 +42,7 @@ Countdown timer component with start/stop controls and formatted display.
 ### timer-init
 
 ```clojure
-(charm/timer-init timer) ; => [timer cmd]
+(timer/timer-init t) ; => [timer cmd]
 ```
 
 Initialize the timer. Returns command to start ticking if `:running` is true.
@@ -50,7 +50,7 @@ Initialize the timer. Returns command to start ticking if `:running` is true.
 ### timer-update
 
 ```clojure
-(charm/timer-update timer msg) ; => [timer cmd]
+(timer/timer-update t msg) ; => [timer cmd]
 ```
 
 Handle tick messages. Decrements timeout and continues ticking until timeout reaches 0.
@@ -58,7 +58,7 @@ Handle tick messages. Decrements timeout and continues ticking until timeout rea
 ### timer-view
 
 ```clojure
-(charm/timer-view timer) ; => "1:00"
+(timer/timer-view t) ; => "1:00"
 ```
 
 Render the timer as formatted duration:
@@ -70,85 +70,88 @@ Render the timer as formatted duration:
 
 ```clojure
 ;; Start the timer, returns [timer cmd]
-(charm/timer-start timer)
+(timer/start t)
 
 ;; Stop the timer, returns [timer nil]
-(charm/timer-stop timer)
+(timer/stop t)
 
 ;; Toggle running state, returns [timer cmd-or-nil]
-(charm/timer-toggle timer)
+(timer/toggle t)
 
 ;; Reset to a timeout value, returns [timer cmd]
-(charm/timer-reset timer 60000)
+(timer/reset t 60000)
 ```
 
 ### Accessors
 
 ```clojure
-(charm/timer-timeout timer)   ; Get remaining ms
-(charm/timer-interval timer)  ; Get tick interval
-(charm/timer-running? timer)  ; Check if running
-(charm/timer-timed-out? timer) ; Check if <= 0
+(timer/timeout t)   ; Get remaining ms
+(timer/interval t)  ; Get tick interval
+(timer/running? t)  ; Check if running
+(timer/timed-out? t) ; Check if <= 0
 ```
 
 ## Full Example
 
 ```clojure
 (ns my-app
-  (:require [charm.core :as charm]))
+  (:require
+   [charm.components.timer :as timer]
+   [charm.message :as msg]
+   [charm.program :as program]))
 
 (def initial-time 30000)  ; 30 seconds
 
 (defn init []
-  (let [[timer cmd] (charm/timer-init
-                     (charm/timer :timeout initial-time
-                                  :interval 100
-                                  :running false))]
-    [{:timer timer
+  (let [[t cmd] (timer/timer-init
+                 (timer/timer :timeout initial-time
+                              :interval 100
+                              :running false))]
+    [{:timer t
       :initial-time initial-time}
      cmd]))
 
 (defn update-fn [state msg]
   (cond
-    (charm/key-match? msg "q")
-    [state charm/quit-cmd]
+    (msg/key-match? msg "q")
+    [state program/quit-cmd]
 
     ;; Space to toggle
-    (charm/key-match? msg " ")
-    (let [[timer cmd] (charm/timer-toggle (:timer state))]
-      [(assoc state :timer timer) cmd])
+    (msg/key-match? msg " ")
+    (let [[t cmd] (timer/toggle (:timer state))]
+      [(assoc state :timer t) cmd])
 
     ;; R to reset
-    (charm/key-match? msg "r")
-    (let [[timer cmd] (charm/timer-reset (:timer state) (:initial-time state))]
-      [(assoc state :timer timer) cmd])
+    (msg/key-match? msg "r")
+    (let [[t cmd] (timer/reset (:timer state) (:initial-time state))]
+      [(assoc state :timer t) cmd])
 
     ;; Handle timer ticks
     :else
-    (let [[timer cmd] (charm/timer-update (:timer state) msg)]
-      [(assoc state :timer timer) cmd])))
+    (let [[t cmd] (timer/timer-update (:timer state) msg)]
+      [(assoc state :timer t) cmd])))
 
 (defn view [state]
-  (let [timer (:timer state)
+  (let [t (:timer state)
         status (cond
-                 (charm/timer-timed-out? timer) "Time's up!"
-                 (charm/timer-running? timer) "Running"
+                 (timer/timed-out? t) "Time's up!"
+                 (timer/running? t) "Running"
                  :else "Paused")]
-    (str "Timer: " (charm/timer-view timer) "\n"
+    (str "Timer: " (timer/timer-view t) "\n"
          "Status: " status "\n\n"
          "Space: start/stop  R: reset  Q: quit")))
 
-(charm/run {:init init :update update-fn :view view :alt-screen true})
+(program/run {:init init :update update-fn :view view :alt-screen true})
 ```
 
 ## Styled Timer
 
 ```clojure
-(charm/timer :timeout 60000
-             :style (charm/style :fg charm/cyan
+(timer/timer :timeout 60000
+             :style (style/style :fg style/cyan
                                  :bold true
                                  :padding [1 2]
-                                 :border charm/rounded-border))
+                                 :border border/rounded))
 ```
 
 ## Timer Events
@@ -169,5 +172,5 @@ The timer sends these message types:
 Check if a message is for a specific timer:
 
 ```clojure
-(charm/for-timer? timer msg) ; => boolean
+(timer/for-timer? t msg) ; => boolean
 ```

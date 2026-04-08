@@ -5,21 +5,21 @@ Keyboard shortcut display component with short and expanded modes.
 ## Quick Example
 
 ```clojure
-(require '[charm.core :as charm])
+(require '[charm.components.help :as help])
 
 (def bindings [{:key "j/k" :desc "up/down"}
                {:key "q" :desc "quit"}])
 
-(def my-help (charm/help bindings))
+(def my-help (help/help bindings))
 
 ;; In view function
-(charm/help-view my-help)  ; => "j/k up/down • q quit"
+(help/short-help-view my-help)  ; => "j/k up/down • q quit"
 ```
 
 ## Creation Options
 
 ```clojure
-(charm/help bindings & options)
+(help/help bindings & options)
 ```
 
 | Option | Type | Default | Description |
@@ -38,22 +38,22 @@ Keyboard shortcut display component with short and expanded modes.
 
 ```clojure
 ;; Maps with :key and :desc
-(charm/help [{:key "j/k" :desc "up/down"}
-             {:key "q" :desc "quit"}])
+(help/help [{:key "j/k" :desc "up/down"}
+            {:key "q" :desc "quit"}])
 
 ;; Pairs (vectors)
-(charm/help [["j/k" "up/down"]
-             ["q" "quit"]])
+(help/help [["j/k" "up/down"]
+            ["q" "quit"]])
 
 ;; Using from-pairs helper
-(charm/help (charm/help-from-pairs
-             "j/k" "up/down"
-             "q" "quit"))
+(help/help (help/from-pairs
+            "j/k" "up/down"
+            "q" "quit"))
 
 ;; Or with vectors
-(charm/help (charm/help-from-pairs
-             ["j/k" "up/down"]
-             ["q" "quit"]))
+(help/help (help/from-pairs
+            ["j/k" "up/down"]
+            ["q" "quit"]))
 ```
 
 ## Display Modes
@@ -63,14 +63,14 @@ Keyboard shortcut display component with short and expanded modes.
 Single line with separator:
 
 ```clojure
-(charm/help bindings)
+(help/help bindings)
 ;; => "j/k up/down • q quit • ? help"
 ```
 
 With width constraint:
 
 ```clojure
-(charm/help bindings :width 30)
+(help/help bindings :width 30)
 ;; => "j/k up/down • q quit • …"
 ```
 
@@ -79,7 +79,7 @@ With width constraint:
 Multi-line with aligned columns:
 
 ```clojure
-(charm/help bindings :show-all true)
+(help/help bindings :show-all true)
 ;; j/k        up/down
 ;; q          quit
 ;; ?          help
@@ -87,76 +87,81 @@ Multi-line with aligned columns:
 
 ## Functions
 
-### help-view
+### short-help-view / full-help-view
 
 ```clojure
-(charm/help-view help) ; => "j/k up/down • q quit"
+(help/short-help-view h) ; => "j/k up/down • q quit"
+(help/full-help-view h)  ; => multi-line aligned view
 ```
 
 Render help as a string.
 
-### help-toggle-show-all
+### toggle-show-all
 
 ```clojure
-(charm/help-toggle-show-all help)
+(help/toggle-show-all h)
 ```
 
 Toggle between short and full display modes.
 
-### help-set-show-all
+### set-show-all
 
 ```clojure
-(charm/help-set-show-all help true)  ; Show full
-(charm/help-set-show-all help false) ; Show short
+(help/set-show-all h true)  ; Show full
+(help/set-show-all h false) ; Show short
 ```
 
-### help-set-bindings
+### set-bindings
 
 ```clojure
-(charm/help-set-bindings help new-bindings)
+(help/set-bindings h new-bindings)
 ```
 
-### help-add-binding
+### add-binding
 
 ```clojure
-(charm/help-add-binding help "n" "new item")
+(help/add-binding h "n" "new item")
 ```
 
-### help-from-pairs
+### from-pairs
 
 ```clojure
 ;; Interleaved arguments
-(charm/help-from-pairs "j" "down" "k" "up" "q" "quit")
+(help/from-pairs "j" "down" "k" "up" "q" "quit")
 
 ;; Vector pairs
-(charm/help-from-pairs ["j" "down"] ["k" "up"] ["q" "quit"])
+(help/from-pairs ["j" "down"] ["k" "up"] ["q" "quit"])
 ```
 
 ## Full Example
 
 ```clojure
 (ns my-app
-  (:require [charm.core :as charm]))
+  (:require
+   [charm.components.help :as help]
+   [charm.message :as msg]
+   [charm.program :as program]
+   [charm.style.core :as style]))
 
 (def bindings
-  (charm/help-from-pairs
+  (help/from-pairs
    "j/k" "navigate"
    "Enter" "select"
    "?" "toggle help"
    "q" "quit"))
 
 (defn init []
-  [{:help (charm/help bindings :width 60)
+  [{:help (help/help bindings :width 60)
     :items ["Item 1" "Item 2" "Item 3"]}
    nil])
 
 (defn update-fn [state msg]
   (cond
-    (charm/key-match? msg "q")
-    [state charm/quit-cmd]
+    (msg/key-match? msg "q")
+    [state program/quit-cmd]
 
-    (charm/key-match? msg "?")
-    [(update state :help charm/help-toggle-show-all) nil]
+    (msg/key-match? msg "?")
+    [(update state :help help/toggle-show-all) nil]
 
     :else
     [state nil]))
@@ -169,19 +174,19 @@ Toggle between short and full display modes.
          (if show-full?
            (str "Keyboard Shortcuts\n"
                 "──────────────────\n"
-                (charm/help-view (:help state)))
-           (charm/help-view (:help state))))))
+                (help/full-help-view (:help state)))
+           (help/short-help-view (:help state))))))
 
-(charm/run {:init init :update update-fn :view view})
+(program/run {:init init :update update-fn :view view})
 ```
 
 ## Styled Help
 
 ```clojure
-(charm/help bindings
-            :key-style (charm/style :fg charm/cyan :bold true)
-            :desc-style (charm/style :fg 250)
-            :separator-style (charm/style :fg 240))
+(help/help bindings
+           :key-style (style/style :fg style/cyan :bold true)
+           :desc-style (style/style :fg 250)
+           :separator-style (style/style :fg 240))
 ```
 
 ## Dynamic Bindings
@@ -191,14 +196,14 @@ Update bindings based on application state:
 ```clojure
 (defn get-bindings [state]
   (if (:editing state)
-    (charm/help-from-pairs
+    (help/from-pairs
      "Esc" "cancel"
      "Enter" "save")
-    (charm/help-from-pairs
+    (help/from-pairs
      "e" "edit"
      "d" "delete"
      "q" "quit")))
 
 (defn view [state]
-  (charm/help-view (charm/help (get-bindings state))))
+  (help/short-help-view (help/help (get-bindings state))))
 ```

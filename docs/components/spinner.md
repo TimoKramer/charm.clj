@@ -5,28 +5,28 @@ Animated loading indicators with 15 built-in animation styles.
 ## Quick Example
 
 ```clojure
-(require '[charm.core :as charm])
+(require '[charm.components.spinner :as spinner])
 
-(def my-spinner (charm/spinner :dots))
+(def my-spinner (spinner/spinner :dots))
 
 ;; Initialize to start animation
-(let [[spinner cmd] (charm/spinner-init my-spinner)]
-  ;; spinner is ready, cmd starts the tick loop
+(let [[s cmd] (spinner/spinner-init my-spinner)]
+  ;; s is ready, cmd starts the tick loop
   )
 
 ;; In update function
-(let [[spinner cmd] (charm/spinner-update spinner msg)]
+(let [[s cmd] (spinner/spinner-update s msg)]
   ;; Handle spinner tick messages
   )
 
 ;; In view function
-(charm/spinner-view spinner)  ; => "⠋" (animates)
+(spinner/spinner-view s)  ; => "⠋" (animates)
 ```
 
 ## Creation Options
 
 ```clojure
-(charm/spinner type & options)
+(spinner/spinner type & options)
 ```
 
 | Option | Type | Default | Description |
@@ -58,8 +58,8 @@ Animated loading indicators with 15 built-in animation styles.
 ## Custom Spinner
 
 ```clojure
-(charm/spinner {:frames ["◐" "◓" "◑" "◒"]
-                :interval 150})
+(spinner/spinner {:frames ["◐" "◓" "◑" "◒"]
+                  :interval 150})
 ```
 
 ## Functions
@@ -67,7 +67,7 @@ Animated loading indicators with 15 built-in animation styles.
 ### spinner-init
 
 ```clojure
-(charm/spinner-init spinner) ; => [spinner cmd]
+(spinner/spinner-init s) ; => [spinner cmd]
 ```
 
 Initialize the spinner and start the tick loop. Returns `[spinner cmd]` where `cmd` triggers the first tick.
@@ -75,7 +75,7 @@ Initialize the spinner and start the tick loop. Returns `[spinner cmd]` where `c
 ### spinner-update
 
 ```clojure
-(charm/spinner-update spinner msg) ; => [spinner cmd]
+(spinner/spinner-update s msg) ; => [spinner cmd]
 ```
 
 Handle tick messages. Returns `[spinner cmd]` to continue animation, or `[spinner nil]` if message not handled.
@@ -83,7 +83,7 @@ Handle tick messages. Returns `[spinner cmd]` to continue animation, or `[spinne
 ### spinner-view
 
 ```clojure
-(charm/spinner-view spinner) ; => "⠋"
+(spinner/spinner-view s) ; => "⠋"
 ```
 
 Render current frame as a string.
@@ -91,7 +91,7 @@ Render current frame as a string.
 ### spinning?
 
 ```clojure
-(charm/spinning? spinner msg) ; => boolean
+(spinner/spinning? s msg) ; => boolean
 ```
 
 Check if a message is a tick for this spinner.
@@ -100,35 +100,38 @@ Check if a message is a tick for this spinner.
 
 ```clojure
 (ns my-app
-  (:require [charm.core :as charm]))
+  (:require
+   [charm.components.spinner :as spinner]
+   [charm.message :as msg]
+   [charm.program :as program]))
 
 (defn init []
-  (let [[spinner cmd] (charm/spinner-init (charm/spinner :dots))]
-    [{:spinner spinner
+  (let [[s cmd] (spinner/spinner-init (spinner/spinner :dots))]
+    [{:spinner s
       :loading true}
      cmd]))
 
 (defn update-fn [state msg]
   (cond
-    (charm/key-match? msg "q")
-    [state charm/quit-cmd]
+    (msg/key-match? msg "q")
+    [state program/quit-cmd]
 
     :else
-    (let [[spinner cmd] (charm/spinner-update (:spinner state) msg)]
-      [(assoc state :spinner spinner) cmd])))
+    (let [[s cmd] (spinner/spinner-update (:spinner state) msg)]
+      [(assoc state :spinner s) cmd])))
 
 (defn view [state]
-  (str (charm/spinner-view (:spinner state))
+  (str (spinner/spinner-view (:spinner state))
        " Loading data..."))
 
-(charm/run {:init init
-            :update update-fn
-            :view view})
+(program/run {:init init
+              :update update-fn
+              :view view})
 ```
 
 ## Styled Spinner
 
 ```clojure
-(charm/spinner :dots
-               :style (charm/style :fg charm/cyan :bold true))
+(spinner/spinner :dots
+                 :style (style/style :fg style/cyan :bold true))
 ```
