@@ -16,12 +16,23 @@
     ""
     (.toString (AttributedString/fromAnsi s))))
 
+(defn column-length
+  "Get the display width of an AttributedString."
+  [^AttributedString attr-s]
+  (.columnLength attr-s))
+
+(defn column-sub-sequence
+  "Get a column-based subsequence of an AttributedString."
+  [^AttributedString attr-s start end]
+  (.columnSubSequence attr-s (int start) (int end)))
+
 (defn string-width
   "Measure the display width of a string in terminal cells.
 
    - ANSI escape sequences have zero width
    - Wide characters (CJK, emojis) count as 2 cells
    - Combining characters count as 0 cells
+   - Grapheme clusters (ZWJ emoji) count as 2 cells
 
    Example:
      (string-width \"hello\")     ; => 5
@@ -30,7 +41,7 @@
   [s]
   (if (or (nil? s) (empty? s))
     0
-    (.columnLength (AttributedString/fromAnsi s))))
+    (column-length (AttributedString/fromAnsi s))))
 
 (defn truncate
   "Truncate a string to fit within a given display width.
@@ -47,13 +58,13 @@
   (if (nil? s)
     s
     (let [attr-s (AttributedString/fromAnsi s)]
-      (if (<= (.columnLength attr-s) width)
+      (if (<= (column-length attr-s) width)
         s
         (let [tail-width (string-width tail)
               target-width (- width tail-width)]
           (if (neg? target-width)
             ""
-            (str (.columnSubSequence attr-s 0 target-width) tail)))))))
+            (str (column-sub-sequence attr-s 0 target-width) tail)))))))
 
 (defn pad-right
   "Pad a string on the right to reach a target display width."

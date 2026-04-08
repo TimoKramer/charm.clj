@@ -237,29 +237,26 @@
         ;; Render initial view
         (render/render! renderer (view @state))
 
-        ;; Drain any initial window-size message to avoid double render
-        ;(a/poll! msg-chan)
-
         ;; Main event loop
         (loop []
           (when @running?
             (when-let [_ (a/<!! (a/timeout 10))]
-             ;; Timeout - just continue
+              ;; Timeout - just continue
               nil)
 
             (when-let [m (a/poll! msg-chan)]
               (cond
-               ;; Quit message
+                ;; Quit message
                 (msg/quit? m)
                 (reset! running? false)
 
-               ;; Error message
+                ;; Error message
                 (= :error (:type m))
                 (do
                   (reset! running? false)
                   (throw (:error m)))
 
-               ;; Window size
+                ;; Window size
                 (= :window-size (:type m))
                 (do
                   (render/update-size! renderer (:width m) (:height m))
@@ -268,7 +265,7 @@
                     (execute-cmd! cmd msg-chan)
                     (render/render! renderer (view new-state))))
 
-               ;; Regular message
+                ;; Regular message
                 :else
                 (let [[new-state cmd] (update @state m)]
                   (reset! state new-state)

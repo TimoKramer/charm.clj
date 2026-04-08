@@ -8,7 +8,7 @@
    [charm.input.handler :as input]
    [charm.input.mouse :as mouse])
   (:import
-   [java.io ByteArrayInputStream ByteArrayOutputStream]
+   [java.io ByteArrayOutputStream PipedInputStream PipedOutputStream]
    [org.jline.terminal TerminalBuilder]))
 
 ;; ---------------------------------------------------------------------------
@@ -17,12 +17,17 @@
 
 (defn make-test-terminal
   "Creates a dumb terminal with the given input bytes.
+   Uses PipedInputStream so JLine 4's pump thread blocks on EOF
+   instead of closing the stream (which would discard buffered data).
    Returns {:terminal terminal :output output-stream}."
   [^String input-str]
-  (let [input (ByteArrayInputStream. (.getBytes input-str "UTF-8"))
+  (let [pos (PipedOutputStream.)
+        pis (PipedInputStream. pos)
         output (ByteArrayOutputStream.)]
+    (.write pos (.getBytes input-str "UTF-8"))
+    (.flush pos)
     {:terminal (-> (TerminalBuilder/builder)
-                   (.streams input output)
+                   (.streams pis output)
                    (.system false)
                    (.type "dumb")
                    (.build))

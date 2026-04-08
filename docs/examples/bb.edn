@@ -9,6 +9,9 @@
   counter {:doc "Run counter example"
            :task (exec 'examples.counter/-main)}
 
+  emoji-width {:doc "Run emoji width demo"
+               :task (exec 'examples.emoji-width/-main)}
+
   download {:doc "Run download example"
             :task (exec 'examples.download/-main)}
 
