@@ -39,8 +39,8 @@
   [base-line overlay-line-str x]
   (let [base-attr (AttributedString/fromAnsi base-line)
         overlay-attr (AttributedString/fromAnsi overlay-line-str)
-        base-width (w/column-length base-attr)
-        overlay-width (w/column-length overlay-attr)
+        base-width (.columnLength base-attr)
+        overlay-width (.columnLength overlay-attr)
         builder (AttributedStringBuilder.)]
     ;; Part before overlay
     (when (pos? x)

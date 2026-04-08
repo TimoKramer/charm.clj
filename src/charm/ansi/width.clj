@@ -5,16 +5,9 @@
    - ANSI escape sequences (zero width)
    - Wide characters (CJK, emojis = 2 cells)
    - Combining characters (zero width)
-   - Grapheme clusters (emoji sequences, via JLine 4 Mode 2027)"
+   - Grapheme clusters (emoji sequences)"
   (:import
-   [org.jline.terminal Terminal]
    [org.jline.utils AttributedString]))
-
-(def ^:dynamic *terminal*
-  "Bound terminal for grapheme-cluster-aware width calculation.
-   When bound, JLine uses Mode 2027 grapheme clustering if the terminal
-   supports it. When nil, falls back to per-codepoint wcwidth."
-  nil)
 
 (defn strip-ansi
   "Remove ANSI escape sequences from a string."
@@ -24,20 +17,14 @@
     (.toString (AttributedString/fromAnsi s))))
 
 (defn column-length
-  "Get the display width of an AttributedString.
-   Uses grapheme clustering when *terminal* is bound and supports Mode 2027."
+  "Get the display width of an AttributedString."
   [^AttributedString attr-s]
-  (if *terminal*
-    (.columnLength attr-s ^Terminal *terminal*)
-    (.columnLength attr-s)))
+  (.columnLength attr-s))
 
 (defn column-sub-sequence
-  "Get a column-based subsequence of an AttributedString.
-   Uses grapheme clustering when *terminal* is bound and supports Mode 2027."
+  "Get a column-based subsequence of an AttributedString."
   [^AttributedString attr-s start end]
-  (if *terminal*
-    (.columnSubSequence attr-s (int start) (int end) ^Terminal *terminal*)
-    (.columnSubSequence attr-s (int start) (int end))))
+  (.columnSubSequence attr-s (int start) (int end)))
 
 (defn string-width
   "Measure the display width of a string in terminal cells.
@@ -45,7 +32,7 @@
    - ANSI escape sequences have zero width
    - Wide characters (CJK, emojis) count as 2 cells
    - Combining characters count as 0 cells
-   - Grapheme clusters (ZWJ emoji) count as 2 cells when *terminal* is bound
+   - Grapheme clusters (ZWJ emoji) count as 2 cells
 
    Example:
      (string-width \"hello\")     ; => 5

@@ -51,36 +51,23 @@ JLine 4.0.0 added built-in Mode 2027 support, handling the entire lifecycle:
 
 - **Probing**: `TerminalBuilder.build()` automatically sends the DECRQM query and parses the response to detect Mode 2027 support
 - **Enabling**: if the terminal supports it, JLine enables Mode 2027 automatically during terminal construction
-- **Width calculation**: `columnLength(terminal)` and `columnSubSequence(start, end, terminal)` are new overloads that accept a `Terminal` parameter. When the terminal has Mode 2027 active, these methods use grapheme clustering (each cluster = 1 or 2 cells). When it doesn't, they fall back to per-codepoint wcwidth — same as JLine 3
+- **Width calculation**: `columnLength()` and `columnSubSequence()` use grapheme clustering internally
 - **Screen diffing**: `Display.update()` uses the terminal's grapheme mode for its internal cursor position tracking, fixing render artifacts with emoji
 - **Cleanup**: `AbstractTerminal.doClose()` automatically sends `CSI ?2027l` to disable the mode, so the terminal is left in a clean state
 
-No custom implementation needed — JLine handles probing, enabling, width calculation, and cleanup.
+Initially (JLine 4.0.0–4.0.8), the no-arg `columnLength()` still used per-codepoint wcwidth and grapheme-aware width required passing a `Terminal` instance via `columnLength(terminal)`. This was fixed in JLine 4.0.9–4.0.10 through several issues:
+
+- **#1727**: Use grapheme cluster width instead of wcwidth when Mode 2027 is active
+- **#1726 / #1729**: Improve DECRQM grapheme cluster probe robustness
+- **#1753 / #1754**: Grapheme-cluster-aware width with per-category emoji detection
+
+Since JLine 4.0.10, the no-arg `columnLength()` correctly handles grapheme clusters, so no `Terminal` parameter needs to be threaded through application code.
 
 ## Decision
 
-Upgrade from JLine 3.30.6 to JLine 4.x and use its built-in Mode 2027 support.
+Upgrade from JLine 3.30.6 to JLine 4.0.10 and use its built-in Mode 2027 support. No custom width logic or terminal threading is needed — JLine handles probing, enabling, width calculation, and cleanup transparently.
 
-### Threading the terminal
-
-JLine 4's grapheme-aware `columnLength(terminal)` and `columnSubSequence(start, end, terminal)` require a `Terminal` reference to check whether Mode 2027 is active. But width functions like `string-width` and `truncate` are called deep in the call stack, inside `view` functions, inside component rendering, inside layout helpers, where passing a terminal explicitly would thread it through every function signature.
-
-We use a dynamic var `charm.ansi.width/*terminal*` to avoid this:
-
-```clojure
-(def ^:dynamic *terminal* nil)
-
-(defn column-length [^AttributedString attr-s]
-  (if *terminal*
-    (.columnLength attr-s ^Terminal *terminal*)   ; grapheme-aware
-    (.columnLength attr-s)))                       ; wcwidth fallback
-```
-
-- `charm.program/run` binds `*terminal*` once at the top of the event loop via `binding`
-- All width calculations within the event loop automatically use the grapheme-aware overload
-- `column-length`, `column-sub-sequence`, `string-width`, `truncate`, `pad-right`, `pad-left` all benefit without any signature changes
-
-When `*terminal*` is unbound (unit tests, REPL usage outside a running program), the functions fall back to JLine's no-arg `columnLength()` which uses per-codepoint wcwidth. This means tests don't need a terminal, and the library degrades gracefully.
+The `charm.ansi.width` namespace provides thin wrappers (`column-length`, `column-sub-sequence`) around JLine's `AttributedString` methods for type hints and int coercion, keeping call sites clean.
 
 ## Consequences
 
@@ -89,6 +76,7 @@ When `*terminal*` is unbound (unit tests, REPL usage outside a running program),
 - Correct width for all emoji types on terminals that support Mode 2027
 - Graceful fallback to wcwidth on terminals that don't
 - No custom width tables or grapheme clustering logic — all JLine
+- No need to thread a `Terminal` reference through the call stack
 - JLine's `Display` also benefits from grapheme mode, fixing screen diffing artifacts
 
 ### Cons
