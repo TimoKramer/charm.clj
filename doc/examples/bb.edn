@@ -9,8 +9,8 @@
   counter {:doc "Run counter example"
            :task (exec 'examples.counter/-main)}
 
-  emoji-width {:doc "Run emoji width demo"
-               :task (exec 'examples.emoji-width/-main)}
+  emojis {:doc "Run emojis example"
+          :task (exec 'examples.emojis/-main)}
 
   download {:doc "Run download example"
             :task (exec 'examples.download/-main)}
@@ -24,11 +24,29 @@
   pomodoro {:doc "Run pomodoro example"
             :task (exec 'examples.pomodoro/-main)}
 
-  spinner {:doc "Run spinner demo"
+  sketch {:doc "Run sketch example"
+          :task (exec 'examples.sketch/-main)}
+
+  spinner {:doc "Run spinner example"
            :task (exec 'examples.spinner-demo/-main)}
 
   timer {:doc "Run timer example"
-         :task (exec 'examples.timer/-main)}
+         :requires ([examples.timer])
+         :task (apply examples.timer/-main *command-line-args*)}
 
   todos {:doc "Run todos example"
-         :task (exec 'examples.todos/-main)}}}
+         :task (exec 'examples.todos/-main)}
+  
+  recreate-gifs {:doc "Recreate all gifs with vhs"
+                 :task (do (shell "vhs vhs/cheatsheet.tape")
+                           (shell "vhs vhs/countdown.tape")
+                           (shell "vhs vhs/counter.tape")
+                           #_(shell "vhs vhs/emojis.tape")
+                           (shell "vhs vhs/download.tape")
+                           (shell "vhs vhs/file-browser.tape")
+                           (shell "vhs vhs/form.tape")
+                           (shell "vhs vhs/pomodoro.tape")
+                           (shell "vhs vhs/sketch.tape")
+                           (shell "vhs vhs/spinner.tape")
+                           #_(shell "vhs vhs/timer.tape")
+                           (shell "vhs vhs/todos.tape"))}}}

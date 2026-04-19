@@ -3,6 +3,7 @@
 ![Status](https://img.shields.io/badge/status-beta-blue)
 [![Clojars Project](https://img.shields.io/clojars/v/de.timokramer/charm.clj.svg)](https://clojars.org/de.timokramer/charm.clj)
 [![GitHub tag](https://img.shields.io/github/v/tag/TimoKramer/charm.clj?label=git%20tag)](https://github.com/TimoKramer/charm.clj/tags)
+[![bb compatible](https://raw.githubusercontent.com/babashka/babashka/master/logo/badge.svg)](https://book.babashka.org#badges)
 
 A Clojure TUI (Terminal User Interface) library inspired by [Bubble Tea](https://github.com/charmbracelet/bubbletea).
 

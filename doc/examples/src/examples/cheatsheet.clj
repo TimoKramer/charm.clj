@@ -224,10 +224,10 @@
       (vec (map (fn [kw] (symbol (namespace kw) (name kw))) see-alsos)))))
 
 (defn- open-overlay [state fn-sym]
-  (let [overlay-width (max 40 (min 60 (- (:width state) 10)))
+  (let [overlay-width (max 40 (- (:width state) 10))
         content-width (- overlay-width 4)
         content (build-overlay-content fn-sym content-width)
-        overlay-height (max 5 (min (- (:height state) 6) 20))
+        overlay-height (max 5 (- (:height state) 12))
         see-alsos (or (extract-see-alsos fn-sym) [])]
     (-> state
         (assoc :mode :overlay)

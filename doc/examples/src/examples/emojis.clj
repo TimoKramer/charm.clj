@@ -1,11 +1,13 @@
-(ns examples.emoji-width
+(ns examples.emojis
   "Demonstrates grapheme cluster width handling with emoji in tables and borders.
 
    Shows that ZWJ sequences, flags, and skin-tone emoji are measured correctly
-   when JLine 4 Mode 2027 is active (see ADR 006)."
+   when JLine 4 Mode 2027 is active (see ADR 007)."
   (:require
-   [charm.core :as charm]
-   [charm.ansi.width :as w]))
+   [charm.components.table :as table]
+   [charm.message :as msg]
+   [charm.program :as program]
+   [charm.style.core :as style]))
 
 ;; ---------------------------------------------------------------------------
 ;; Data
@@ -34,28 +36,28 @@
 ;; ---------------------------------------------------------------------------
 
 (def title-style
-  (charm/style :bold true :fg charm/magenta))
+  (style/style :bold true :fg style/magenta))
 
 (def subtitle-style
-  (charm/style :fg charm/cyan :italic true))
+  (style/style :fg style/cyan :italic true))
 
 (def box-style
-  (charm/style :border charm/rounded-border
+  (style/style :border style/rounded-border
                :padding [0 1]
-               :border-fg charm/cyan))
+               :border-fg style/cyan))
 
 (def header-style
-  (charm/style :bold true :fg charm/yellow))
+  (style/style :bold true :fg style/yellow))
 
 (def cursor-style
-  (charm/style :bold true :fg charm/green))
+  (style/style :bold true :fg style/green))
 
 ;; ---------------------------------------------------------------------------
 ;; Init / Update / View
 ;; ---------------------------------------------------------------------------
 
 (defn init []
-  (let [tbl (charm/table [{:title "Emoji" :width 6}
+  (let [tbl (table/table [{:title "Emoji" :width 6}
                           {:title "Name" :width 22}
                           {:title "Type" :width 34}
                           {:title "Expect" :width 6}
@@ -70,21 +72,21 @@
 
 (defn update-fn [tbl msg]
   (cond
-    (or (charm/key-match? msg "q")
-        (charm/key-match? msg "ctrl+c"))
-    [tbl charm/quit-cmd]
+    (or (msg/key-match? msg "q")
+        (msg/key-match? msg "ctrl+c"))
+    [tbl program/quit-cmd]
 
     :else
-    (charm/table-update tbl msg)))
+    (table/table-update tbl msg)))
 
 (defn view [tbl]
   (let [rows (mapv (fn [[emoji name desc]]
-                     [emoji name desc "2" (str (w/string-width emoji))])
+                     [emoji name desc "2" (str (style/string-width emoji))])
                    emoji-rows)
         tbl (assoc tbl :rows rows)]
-    (str (charm/render title-style "Grapheme Cluster Width Demo") "\n"
-         (charm/render subtitle-style "Emoji should align neatly if Mode 2027 is active") "\n\n"
-         (charm/render box-style (charm/table-view tbl {:separator " │ "}))
+    (str (style/render title-style "Grapheme Cluster Width Demo") "\n"
+         (style/render subtitle-style "Emoji should align neatly if Mode 2027 is active") "\n\n"
+         (style/render box-style (table/table-view tbl {:separator " │ "}))
          "\n\n"
          "j/k navigate  q quit")))
 
@@ -93,7 +95,7 @@
 ;; ---------------------------------------------------------------------------
 
 (defn -main [& _args]
-  (charm/run {:init init
-              :update update-fn
-              :view view
-              :alt-screen true}))
+  (program/run {:init init
+                :update update-fn
+                :view view
+                :alt-screen true}))
