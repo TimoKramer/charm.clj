@@ -181,6 +181,31 @@ program/quit-cmd
 
 Please take a look at the [examples](doc/examples/README.md) in the doc folder and don't hesitate to contribute your examples please.
 
+## REPL Development
+
+`program/run` blocks the calling thread, which makes it awkward to use from a REPL. Use `program/run-async`
+instead: it starts the event loop on a background thread and returns a handle with `:quit!` and `:result`.
+
+To iterate on `update` and `view` while the program is running, pass them as **vars** (`#'update-fn`,
+`#'view-fn`) rather than function values. The event loop dereferences the var on every message, so redefs
+take effect immediately.
+
+One caveat: the renderer only redraws in response to messages. After you redefine `view-fn`, the screen
+won't change until the next event arrives — press any key, move the mouse, or resize the terminal to
+trigger a redraw.
+
+Don't use `println` for debugging while a program is running — it writes directly to the same terminal
+the renderer owns and will corrupt the display. Use `tap>` instead and read the values from a tap
+receiver like [Portal](https://github.com/djblue/portal) or a REPL-side `add-tap` handler.
+
+```clojure
+(def p (program/run-async {:init {:count 0}
+                           :update #'update-fn
+                           :view #'view-fn}))
+
+((:quit! p))
+```
+
 ## Project Structure
 
 ```
