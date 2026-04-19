@@ -3,37 +3,53 @@
 ## Run examples
 
 ```
-clj -M -m examples.pomodoro
+bb cheatsheet
+```
+![cheatsheet gif](images/cheatsheet.gif)
+```
+bb pomodoro
 ```
 ![pomodoro gif](images/pomodoro.gif)
 ```
-clj -M -m examples.download
+bb download
 ```
 ![download gif](images/download.gif)
 ```
-clj -M -m examples.spinner-demo
+bb spinner
 ```
 ![spinner gif](images/spinner.gif)
 ```
-clj -M -m examples.todos
+bb todos
 ```
 ![todos gif](images/todos.gif)
 ```
-clj -M -m examples.countdown
+bb countdown
 ```
 ![countdown gif](images/countdown.gif)
 ```
-clj -M -m examples.file-browser
+bb file-browser
 ```
 ![file browser gif](images/file_browser.gif)
 ```
-clj -M -m examples.form
+bb form
 ```
 ![form gif](images/form.gif)
 ```
-clj -M -m examples.counter
+bb counter
 ```
 ![counter gif](images/counter.gif)
+```
+bb timer 5
+```
+![timer gif](images/timer.gif)
+```
+bb sketch
+```
+![sketch gif](images/sketch.gif)
+```
+bb emojis
+```
+![emojis gif](images/emojis.gif)
 
 ## native-image compilation
 
@@ -42,4 +58,3 @@ clj -T:build all
 native-image -jar target/timer.jar -o timer
 ./timer -n Pomodoro 30m
 ```
-
