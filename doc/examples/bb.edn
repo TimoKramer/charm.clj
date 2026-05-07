@@ -22,8 +22,8 @@
   form {:doc "Run form example"
         :task (exec 'examples.form/-main)}
 
-  presentation {:doc "Run presentation example"
-                :task (exec 'examples.paginator-demo/-main)}
+  talk {:doc "Run talk example"
+        :task (exec 'examples.talk/-main)}
 
   pomodoro {:doc "Run pomodoro example"
             :task (exec 'examples.pomodoro/-main)}
