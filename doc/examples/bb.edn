@@ -1,4 +1,5 @@
-{:paths ["src" "../../src"]
+{:paths ["src" "../../src" "resources"]
+ :deps {djblue/portal {:mvn/version "0.58.5"}}
  :tasks
  {cheatsheet {:doc "Run cheatsheet example"
               :task (exec 'examples.cheatsheet/-main)}
@@ -20,6 +21,9 @@
 
   form {:doc "Run form example"
         :task (exec 'examples.form/-main)}
+
+  presentation {:doc "Run presentation example"
+                :task (exec 'examples.paginator-demo/-main)}
 
   pomodoro {:doc "Run pomodoro example"
             :task (exec 'examples.pomodoro/-main)}
@@ -49,4 +53,15 @@
                            (shell "vhs vhs/sketch.tape")
                            (shell "vhs vhs/spinner.tape")
                            #_(shell "vhs vhs/timer.tape")
-                           (shell "vhs vhs/todos.tape"))}}}
+                           (shell "vhs vhs/todos.tape"))}
+
+  portal {:doc "Start nREPL server with portal + tap> wired up"
+          :requires ([babashka.nrepl.server :as nrepl]
+                     [portal.api :as p])
+          :task (do
+                  (p/open)
+                  (add-tap p/submit)
+                  (println "Portal opened. nREPL on localhost:1667")
+                  (nrepl/start-server! {:port 1667})
+                  (deref (promise)))}}}
+
