@@ -107,12 +107,24 @@
      :keys         - Custom key bindings
      :id           - Unique ID"
   ([table-map]
-   (table table-map nil))
-  ([table-map {:keys [header-opts] :as opts}]
    (let [[columnsv rowsv] (table-map->cols+rows table-map)
-         charm-headers (columnsv->charm-headers columnsv
-                                                :header-opts header-opts)]
-     (table charm-headers rowsv opts)))
+         charm-headers (columnsv->charm-headers columnsv :header-opts nil)]
+     (table charm-headers rowsv)))
+  ([table-map {:keys [header-opts] :as opts}]
+   (cond
+     (map? opts)
+     (let [[columnsv rowsv] (table-map->cols+rows table-map)
+           charm-headers (columnsv->charm-headers columnsv
+                                                  :header-opts header-opts)]
+       (table charm-headers rowsv opts))
+
+     (vector? opts)
+     (table table-map opts nil)
+
+     :else
+     (throw (IllegalArgumentException.
+             (str "Expected second argument to be a map (tabular map options) "
+                  "or a vector (explicit row data), got: " (pr-str opts))))))
   ([columns rows & {:keys [cursor height header?
                            header-style row-style cursor-style
                            keys id]
