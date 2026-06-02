@@ -3,6 +3,8 @@
    [charm.components.table :as table]
    [charm.message :as msg]
    [clojure.string :as str]
+   [clojure.walk :refer [stringify-keys]]
+   [clojure.set :refer [difference]]
    [clojure.test :refer [deftest is testing]]))
 
 (def sample-columns
@@ -12,6 +14,10 @@
   [["foo" "bar"]
    ["baz" "qux"]
    ["hello" "world"]])
+
+(def sample-tabular-map
+  [{:name "John" :family-name "Doe"}
+   {:name "Jane" :family-name "Douglass"}])
 
 (deftest table-creation-test
   (testing "create table"
@@ -162,3 +168,15 @@
           [new-tbl cmd] (table/table-init tbl)]
       (is (= tbl new-tbl))
       (is (nil? cmd)))))
+
+(deftest table-map->cols+rows-test
+  (testing "returns correct output for correct input"
+    (let [[columnsv rowsv] (table/table-map->cols+rows sample-tabular-map)]
+      ;; Columns are correctly parsed
+      (is (empty? (difference
+                   (set columnsv)
+                   (set (keys (stringify-keys (first sample-tabular-map)))))))
+      ;; Rows are correctly parsed
+      (is (and
+           (= (val (ffirst sample-tabular-map)) (ffirst rowsv))
+           (= (val (last (last sample-tabular-map))) (last (last rowsv))))))))

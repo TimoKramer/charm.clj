@@ -15,7 +15,8 @@
    [charm.ansi.width :as w]
    [charm.message :as msg]
    [charm.style.core :as style]
-   [clojure.string :as str]))
+   [clojure.string :as str]
+   [clojure.walk :refer [stringify-keys]]))
 
 ;; ---------------------------------------------------------------------------
 ;; Key Bindings
@@ -38,6 +39,38 @@
 ;; ---------------------------------------------------------------------------
 ;; Table Creation
 ;; ---------------------------------------------------------------------------
+
+(defn table-map->cols+rows
+  "Convert a tabular map format to separate columns vector and rows vector (vec of vecs).
+
+  * Args
+    * tbl-map: a tabular map structure.
+        ` [{:name \"John\" :family-name \"Doe\"} {:name \"Jane\" :family-name \"Dough\"}]`
+  * Returns
+    `[tbl-headers tbl-rows]`"
+  [tbl-map]
+  (let [tbl-headers (vec (keys (stringify-keys (first tbl-map))))
+        tbl-rows (mapv #(vec (vals %)) tbl-map)]
+    [tbl-headers tbl-rows]))
+
+;; TEST: Write tests for this function
+(defn- columnsv->charm-headers
+  "Convert vector of strings that represent headers, to a headers format
+  consumable by charm.clj tables."
+  [headersv & {:keys [header-opts]}]
+  (let [header-default-width 20
+        header-opts-str (stringify-keys header-opts)]
+    (map (fn [header]
+           (let [col-opts (get header-opts-str header)]
+             (if (nil? col-opts)
+               {:title header :width header-default-width}
+               {:title (if (col-opts "title")
+                         (col-opts "title")
+                         header)
+                :width (if (col-opts "width")
+                         (col-opts "width")
+                         header-default-width)})))
+         headersv)))
 
 (defn table
   "Create a table component.
