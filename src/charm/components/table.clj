@@ -75,39 +75,70 @@
 (defn table
   "Create a table component.
 
-   Columns is a vector of column definitions:
-     [{:title \"Name\" :width 20} {:title \"Value\" :width 30}]
+  Two formats of input data is supported:
+  1. Explicit columns and rows:
+     Columns is a vector of column definitions:
+     `[{:title \"Name\" :width 20} {:title \"Value\" :width 30}]`
 
-   Rows is a vector of row vectors (each row has one value per column):
-     [[\"foo\" \"bar\"] [\"baz\" \"qux\"]]
+     Rows is a vector of row vectors (each row has one value per column):
+     `[[\"foo\" \"bar\"] [\"baz\" \"qux\"]]`
+  2. Tabular map data. Key names will automatically become column titles, and their
+     values will be row data.
+     ```
+     [{:name \"John\" :family-name \"Doe\"}
+      {:name \"Jane\" :family-name \"Dough\"}]
+     ```
+     It is also recommended to pass `header-opts` with this type of invocation
+     otherwise, defaults will be used.
+     - `header-opts` is a map for specifying options like width and title of columns.
+       ```
+       {:name {:title \"Name\" :width 20}
+        :family-name {:title \"Family Name\" :width 35}}
+       ```
 
    Options:
      :cursor       - Row cursor position (nil = not interactive, int = selected row)
      :height       - Visible height in rows (0 = show all rows)
      :header?      - Show header row (default true)
      :header-style - Style for header text
+     :header-opts? - Header options (for using with tabular map)
      :row-style    - Style for normal row text
      :cursor-style - Style for selected row text
      :keys         - Custom key bindings
      :id           - Unique ID"
-  [columns rows & {:keys [cursor height header?
-                          header-style row-style cursor-style
-                          keys id]
-                   :or {height 0
-                        header? true
-                        id (rand-int 1000000)}}]
-  {:type :table
-   :id id
-   :columns (vec columns)
-   :rows (vec rows)
-   :cursor cursor
-   :offset 0
-   :height height
-   :header? header?
-   :header-style (or header-style (style/style :bold true))
-   :row-style row-style
-   :cursor-style (or cursor-style (style/style :fg :cyan :bold true))
-   :keys (merge default-keys keys)})
+  ([table-map]
+   (table table-map nil))
+  ([table-map {:keys [header-opts] :as opts}]
+   (let [[columnsv rowsv] (table-map->cols+rows table-map)
+         charm-headers (columnsv->charm-headers columnsv
+                                                :header-opts header-opts)]
+     (table charm-headers rowsv opts)))
+  ([columns rows & {:keys [cursor height header?
+                           header-style row-style cursor-style
+                           keys id]
+                    :or {height 0
+                         header? true
+                         id (rand-int 1000000)}}]
+   {:type :table
+    :id id
+    :columns (vec columns)
+    :rows (vec rows)
+    :cursor cursor
+    :offset 0
+    :height height
+    :header? header?
+    :header-style (or header-style (style/style :bold true))
+    :row-style row-style
+    :cursor-style (or cursor-style (style/style :fg :cyan :bold true))
+    :keys (merge default-keys keys)}))
+
+(comment
+  ;; TODO: these can be good basis for testing different arities of `table`
+  (table [{:foo "x" :bar "y"} {:foo "z" :bar "t"}])
+  (table [{:foo "x" :bar "y"} {:foo "z" :bar "t"}] {:header-opts {:foo {:title "FOOW" :width 40}}
+                                                    :cursor 3
+                                                    :keys {:cursor-up ["h"]}})
+  (table [{:title "foo"} {:title "bar"}] [["x" "y"] ["a" "b"]]))
 
 ;; ---------------------------------------------------------------------------
 ;; Table Accessors
