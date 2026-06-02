@@ -61,15 +61,10 @@
   (let [header-default-width 20
         header-opts-str (stringify-keys header-opts)]
     (map (fn [header]
-           (let [col-opts (get header-opts-str header)]
-             (if (nil? col-opts)
-               {:title header :width header-default-width}
-               {:title (if (col-opts "title")
-                         (col-opts "title")
-                         header)
-                :width (if (col-opts "width")
-                         (col-opts "width")
-                         header-default-width)})))
+           (if-let [col-opts (get header-opts-str header)]
+             {:title (or (col-opts "title") header)
+              :width (or (col-opts "width") header-default-width)}
+             {:title header :width header-default-width}))
          headersv)))
 
 (defn table
@@ -88,7 +83,7 @@
      [{:name \"John\" :family-name \"Doe\"}
       {:name \"Jane\" :family-name \"Dough\"}]
      ```
-     It is also recommended to pass `header-opts` with this type of invocation
+     It also optionally accepts `header-opts` along with other table options
      otherwise, defaults will be used.
      - `header-opts` is a map for specifying options like width and title of columns.
        ```
@@ -109,7 +104,7 @@
   ([table-map]
    (let [[columnsv rowsv] (table-map->cols+rows table-map)
          charm-headers (columnsv->charm-headers columnsv :header-opts nil)]
-     (table charm-headers rowsv)))
+     (table charm-headers rowsv nil)))
   ([table-map {:keys [header-opts] :as opts}]
    (cond
      (map? opts)
