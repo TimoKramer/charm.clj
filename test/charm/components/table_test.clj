@@ -20,11 +20,32 @@
    {:name "Jane" :family-name "Douglass"}])
 
 (deftest table-creation-test
+  ;; TODO: test if wrong argumnets are handled
   (testing "create table"
     (let [tbl (table/table sample-columns sample-rows)]
       (is (= :table (:type tbl)))
       (is (= sample-rows (table/table-rows tbl)))
       (is (nil? (table/table-cursor tbl)))))
+
+  (testing "create table with vector of maps"
+    (testing "basic tabular map"
+      (let [tbl (table/table sample-tabular-map)]
+        (is (= :table (:type tbl)))
+        (is (= [["John" "Doe"] ["Jane" "Douglass"]]
+               (table/table-rows tbl)))))
+
+    (testing "with header-opts"
+      (let [tbl (table/table sample-tabular-map
+                             {:header-opts {:name {:title "Name" :width 30}}})]
+        (is (= "Name" (:title (first (:columns tbl)))))
+        (is (= 30 (:width (first (:columns tbl)))))
+        (is (= 20 (:width (second (:columns tbl)))))))
+
+    (testing "with nested opts like :keys"
+      (let [tbl (table/table sample-tabular-map
+                             {:keys {:cursor-up ["h"]} :cursor 0})]
+        (is (= ["h"] (get-in tbl [:keys :cursor-up])))
+        (is (= 0 (table/table-cursor tbl))))))
 
   (testing "create table with cursor"
     (let [tbl (table/table sample-columns sample-rows :cursor 0)]
@@ -180,3 +201,26 @@
       (is (and
            (= (val (ffirst sample-tabular-map)) (ffirst rowsv))
            (= (val (last (last sample-tabular-map))) (last (last rowsv))))))))
+
+(deftest columnsv->charm-headers-test
+  (testing "Correct inputs return correct results"
+    (testing "without header-opts"
+      (let [result (#'table/columnsv->charm-headers ["foo" "bar"])]
+        (is (= '({:title "foo" :width 20} {:title "bar" :width 20})
+               result))))
+    (testing "with header-opts"
+      (let [result (#'table/columnsv->charm-headers
+                     ["foo" "bar"]
+                     {:header-opts {:foo {:title "FOO" :width 40}}})]
+        (is (= '({:title "FOO" :width 40} {:title "bar" :width 20})
+               result)))))
+  (testing "Bad inputs are handled"
+    (testing "string instead of vector"
+      (is (thrown? AssertionError
+                   (#'table/columnsv->charm-headers "foo"))))
+    (testing "empty headers"
+      (is (thrown? AssertionError
+                   (#'table/columnsv->charm-headers []))))
+    (testing "nil headers"
+      (is (thrown? AssertionError
+                   (#'table/columnsv->charm-headers nil))))))

@@ -53,11 +53,11 @@
         tbl-rows (mapv #(vec (vals %)) tbl-map)]
     [tbl-headers tbl-rows]))
 
-;; TEST: Write tests for this function
 (defn- columnsv->charm-headers
   "Convert vector of strings that represent headers, to a headers format
   consumable by charm.clj tables."
   [headersv & {:keys [header-opts]}]
+  {:pre [(and (sequential? headersv) (not (empty? headersv)))]}
   (let [header-default-width 20
         header-opts-str (stringify-keys header-opts)]
     (map (fn [header]
@@ -143,14 +143,6 @@
     :row-style row-style
     :cursor-style (or cursor-style (style/style :fg :cyan :bold true))
     :keys (merge default-keys keys)}))
-
-(comment
-  ;; TODO: these can be good basis for testing different arities of `table`
-  (table [{:foo "x" :bar "y"} {:foo "z" :bar "t"}])
-  (table [{:foo "x" :bar "y"} {:foo "z" :bar "t"}] {:header-opts {:foo {:title "FOOW" :width 40}}
-                                                    :cursor 3
-                                                    :keys {:cursor-up ["h"]}})
-  (table [{:title "foo"} {:title "bar"}] [["x" "y"] ["a" "b"]]))
 
 ;; ---------------------------------------------------------------------------
 ;; Table Accessors
