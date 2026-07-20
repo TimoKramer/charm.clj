@@ -58,6 +58,9 @@
     (is (= {:type :focus} (k/parse-escape-sequence "[I")))
     (is (= {:type :blur} (k/parse-escape-sequence "[O"))))
 
+  (testing "shift+tab (backtab)"
+    (is (= {:type :tab :shift true} (k/parse-escape-sequence "[Z"))))
+
   (testing "unknown sequences"
     (let [result (k/parse-escape-sequence "[999X")]
       (is (= :unknown (:type result)))

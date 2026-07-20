@@ -80,6 +80,11 @@
       (is (= {:type :tab}
              (input/read-event terminal)))))
 
+  (testing "shift+tab (backtab)"
+    (with-test-terminal [terminal "\u001b[Z"]
+      (is (= {:type :tab :shift true}
+             (input/read-event terminal)))))
+
   (testing "backspace (DEL)"
     (with-test-terminal [terminal "\u007f"]
       (is (= {:type :backspace}
