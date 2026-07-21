@@ -73,7 +73,8 @@
 
 (def ^:private special-keys
   "Special key sequences (focus, paste)."
-  [{:event {:type :focus}       :seqs ["[I"]}
+  [{:event {:type :tab :shift true} :seqs ["[Z"]}
+   {:event {:type :focus}       :seqs ["[I"]}
    {:event {:type :blur}        :seqs ["[O"]}
    {:event {:type :paste-start} :seqs ["[200~"]}
    {:event {:type :paste-end}   :seqs ["[201~"]}])
