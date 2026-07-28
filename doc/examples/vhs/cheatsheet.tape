@@ -1,7 +1,7 @@
 Output images/cheatsheet.gif
 
-Set Width 1200
-Set Height 600
+Set Width 2000
+Set Height 1000
 Set TypingSpeed 300ms
 Set Shell bash
 

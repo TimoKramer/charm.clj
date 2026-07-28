@@ -1,4 +1,4 @@
-{:paths ["src"]
+{:paths ["src" "resources"]
  :deps {de.timokramer/charm.clj {:local/root "../../"}
         com.github.clj-easy/graal-build-time {:mvn/version "1.0.5"}}
  :aliases
