@@ -121,9 +121,7 @@
   [hlp]
   (let [{:keys [bindings width separator separator-style ellipsis]} hlp
         sep (style/render separator-style separator)]
-    (if (zero? width)
-      ;; No width constraint
-      (str/join sep (map #(render-binding hlp %) bindings))
+    (if width
       ;; With width constraint - truncate as needed
       (loop [result []
              remaining bindings
@@ -143,7 +141,9 @@
               (str (str/join sep result) sep (render-bg (:bg hlp) ellipsis))
               (recur (conj result rendered)
                      (rest remaining)
-                     new-width))))))))
+                     new-width)))))
+      ;; No width constraint
+      (str/join sep (map #(render-binding hlp %) bindings)))))
 
 (defn full-help-view
   "Render full help (multi-line grouped)."
