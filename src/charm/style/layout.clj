@@ -38,11 +38,11 @@
 ;; ---------------------------------------------------------------------------
 
 (defn- split-lines
-  "Split text into lines, handling empty strings."
+  "Split text into lines, preserving trailing empty lines."
   [s]
   (if (empty? s)
     [""]
-    (str/split-lines s)))
+    (str/split s #"\r?\n" -1)))
 
 (defn- widest-line
   "Get the width of the widest line in text."
