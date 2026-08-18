@@ -7,6 +7,10 @@ bb cheatsheet
 ```
 ![cheatsheet gif](images/cheatsheet.gif)
 ```
+bb talk
+```
+![talk gif](images/talk.gif)
+```
 bb pomodoro
 ```
 ![pomodoro gif](images/pomodoro.gif)

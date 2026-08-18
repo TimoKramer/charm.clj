@@ -15,8 +15,7 @@
    [charm.components.timer :as timer]
    [charm.message :as msg]
    [charm.program :as program]
-   [charm.style.core :as style]
-   [clojure.string :as str])
+   [charm.style.core :as style])
   (:gen-class))
 
 ;; ---------------------------------------------------------------------------
@@ -96,11 +95,12 @@
          (style/render hint-style "↑/↓ to select, Enter to start, q to quit"))))
 
 ;; ---------------------------------------------------------------------------
-;; View - Timer Running
+;; View - Timer
 ;; ---------------------------------------------------------------------------
 
-(defn view-running [state]
-  (let [{:keys [phase timer total-ms cycle-count]} state
+(defn view-timer [state]
+  (let [{:keys [phase timer total-ms cycle-count screen]} state
+        paused? (= screen :paused)
         remaining (max 0 (timer/timeout timer))
         elapsed (- total-ms remaining)
         p (if (pos? total-ms) (/ elapsed total-ms) 0.0)
@@ -112,6 +112,8 @@
                                    :empty-style (style/style :fg (gradient-color p phase true)))]
     (str (style/render (phase-style phase) phase-label)
          (style/render hint-style (str " (cycle " cycle-count ")"))
+         (when paused? "  ")
+         (when paused? (style/render (style/style :fg (style/rgb 255 200 100) :bold true) "PAUSED"))
          "\n\n"
          (progress/progress-view bar)
          "  "
@@ -120,40 +122,14 @@
          (style/render hint-style "p to pause/resume, q to quit"))))
 
 ;; ---------------------------------------------------------------------------
-;; View - Paused
-;; ---------------------------------------------------------------------------
-
-(defn view-paused [state]
-  (let [{:keys [phase timer total-ms cycle-count]} state
-        remaining (max 0 (timer/timeout timer))
-        elapsed (- total-ms remaining)
-        p (if (pos? total-ms) (/ elapsed total-ms) 0.0)
-        phase-label (if (= phase :work) "WORK" "BREAK")
-        bar (progress/progress-bar :width 30
-                                   :percent p
-                                   :bar-style :thick
-                                   :full-style (style/style :fg (gradient-color p phase))
-                                   :empty-style (style/style :fg (gradient-color p phase true)))]
-    (str (style/render (phase-style phase) phase-label)
-         (style/render hint-style (str " (cycle " cycle-count ")"))
-         "  "
-         (style/render (style/style :fg (style/rgb 255 200 100) :bold true) "PAUSED")
-         "\n\n"
-         (progress/progress-view bar)
-         "  "
-         (style/render time-style (format-remaining remaining))
-         "\n\n"
-         (style/render hint-style "p to resume, q to quit"))))
-
-;; ---------------------------------------------------------------------------
 ;; Main View
 ;; ---------------------------------------------------------------------------
 
 (defn view [state]
   (case (:screen state)
     :selecting (view-selecting state)
-    :running (view-running state)
-    :paused (view-paused state)))
+    :running (view-timer state)
+    :paused (view-timer state)))
 
 ;; ---------------------------------------------------------------------------
 ;; Timer Helpers
@@ -180,6 +156,7 @@
 ;; ---------------------------------------------------------------------------
 
 (defn update-fn [state msg]
+  (tap> state)
   (let [{:keys [screen]} state]
     (cond
       ;; Global quit
@@ -269,3 +246,10 @@
                     :alt-screen false
                     :hide-cursor true})
       (println))))
+
+(comment
+  (def app (program/run-async {:init init
+                               :update #'update-fn
+                               :view #'view
+                               :alt-screen false
+                               :hide-cursor true})))
