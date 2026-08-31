@@ -14,10 +14,10 @@ location, and a concrete suggestion.
 
 ## Top priorities
 
-1. **Background color detection / adaptive colors (J1)** — first thing to solve.
-   JLine 4 exposes `getDefaultBackgroundColor()` (OSC 10/11 query); wire it up
-   to offer light/dark-adaptive styling, and wire in the dormant
-   `detect-color-profile` / `downgrade-color` code while in there.
+1. ~~**Background color detection / adaptive colors (J1)**~~ — **done**, together
+   with U1. JLine 4 exposes `getDefaultBackgroundColor()` (OSC 10/11 query);
+   wired up to offer light/dark-adaptive styling, with the dormant
+   `detect-color-profile` / `downgrade-color` code wired in alongside.
 2. **Sanitize untrusted content before it reaches the terminal**, and make
    `strip-ansi` honest — OSC 52 injection writes attacker data into the user's
    system clipboard. This is a real vulnerability, not a hardening nit. (S1, S2)
@@ -26,7 +26,7 @@ location, and a concrete suggestion.
    (P1, P2, P3)
 4. **Fix `:fg 240`, `:strikethrough` and `"pgup"`** — three small bugs that make
    documented features, the library's own default styling, and Page Up/Down
-   silently do nothing. (U1, U2, U3)
+   silently do nothing. (U1 — **done**; U2, U3 outstanding)
 
 ---
 
@@ -243,7 +243,7 @@ the `$`. Consider gating release on a tag rather than every push to `main`.
 
 ## 3. Usability
 
-### U1 — `:fg 240` silently does nothing
+### U1 — `:fg 240` silently does nothing — **done**
 
 `doc/api/styling.md:198` documents it as "ANSI 256 shorthand", but
 `src/charm/style/color.clj:118` dispatches on `(:type color)`, which is `nil` for
@@ -257,6 +257,12 @@ default styling, and most of the sample code all render as plain text.
 
 **Suggestion:** coerce integers and keywords to colour maps in `style` /
 `with-fg` / `with-bg`, or throw on an unrecognised colour value.
+
+**Resolved:** `charm.style.color/coerce-color` accepts integers (ANSI 256),
+keywords (ANSI 16 names) and strings (hex), and throws an `ex-info` naming the
+offending value otherwise. Coercion happens in `apply-color-fg` / `apply-color-bg`
+rather than in each constructor, so every entry point — `style`, `with-fg`,
+`with-bg`, `styled-str` — picks it up at once.
 
 ### U2 — `:strikethrough` silently does nothing
 
@@ -369,7 +375,7 @@ Already absorbed: Mode 2027 grapheme clustering (ADR 007), the 4.3.1 ReDoS
 guards, 4.1's `Display.update()` optimizations, and the shift+tab CSI Z binding
 (done in-repo, `aa6a75e` — JLine still doesn't bind it).
 
-### J1 — Background color detection / adaptive colors  ← do this first
+### J1 — Background color detection / adaptive colors — **done**
 
 JLine 4 can query the terminal's actual default colors (OSC 10/11):
 
@@ -399,6 +405,45 @@ Related dormant code: `charm.style.color` already contains
   `:environment` msg at startup) so apps can branch on it.
 - Note the interaction with U1: fixing integer-color coercion first avoids
   building adaptive colors on top of a constructor that silently drops ints.
+
+**Resolved:**
+
+- `charm.terminal/dark-background?` queries `getDefaultBackgroundColor`, computes
+  luminance via `dark-color?`, and defaults to dark when the query returns -1.
+- Adaptive colors are `{:type :adaptive :light … :dark …}`, built with
+  `style/adaptive` and resolved at render time by `color/resolve-color`.
+- `run` detects profile and background once at startup, binds
+  `*color-profile*` / `*dark-background?*` around the event loop, and sends an
+  `:environment` message so apps can branch themselves.
+- Documented in `doc/api/styling.md` (adaptive colors, profile table) and
+  `doc/api/messages.md` (`:environment`).
+
+**Two premises above turned out to be wrong, and are worth recording:**
+
+1. *"ANSI-only terminals get raw true-color escapes."* They never did — and
+   neither does anything else. `AttributedString.toAnsi()` called without a
+   terminal argument collapses 24-bit colors to the 256 palette, so charm has
+   never emitted a `38;2;r;g;b` sequence: `(rgb 255 0 0)` renders as
+   `ESC[38;5;196m` even under the `:true-color` profile, and the existing tests
+   in `test/charm/style/color_test.clj` assert exactly that. Making true color
+   actually reach the terminal is a separate change — it needs the `toAnsi`
+   overload that takes a terminal — and it belongs with the Phase 4 render work,
+   since it changes those assertions.
+
+2. *`downgrade-color` was dormant but also wrong.* Its `:ansi` branch did
+   `(mod code 16)` on a 256-cube index, which is colorimetrically meaningless:
+   orange `(rgb 255 128 0)` came out **cyan**. Harmless while nothing called it,
+   but wiring it in would have turned every RGB color on a `TERM=xterm` terminal
+   into an effectively random one of 16 — worse than the previous
+   pass-everything-through behavior. Replaced with a nearest-neighbour match
+   against the existing `ansi-hex` table, plus a new `ansi256->rgb` covering the
+   cube and the grayscale ramp. Orange now lands on bright yellow, with a
+   regression test pinning it.
+
+**Caveat for the Phase 3/4 loop rewrite:** `*color-profile*` and
+`*dark-background?*` are thread-local. The current single-threaded render path is
+fine, but a `view` that renders parts on other threads would not see them —
+`bound-fn` or explicit conveyance would be needed.
 
 ### J2 — `KeyEvent` / `KeyParser`: revisit ADR 004
 
@@ -484,9 +529,11 @@ the previous handler** — exactly what S5 needs to restore Ctrl+C after exit.
 
 ## Suggested sequencing
 
-**Phase 0 — background color detection (J1)**
-First thing to solve. Do U1 (integer-color coercion) as its opening step so
-adaptive colors aren't built on a constructor that silently drops ints.
+**Phase 0 — background color detection (J1)** — **done**
+U1 (integer-color coercion) landed as its opening step, so adaptive colors
+aren't built on a constructor that silently drops ints. Also fixed
+`downgrade-color`'s nearest-ANSI-16 mapping, which the wiring made reachable.
+162 tests / 994 assertions passing, up from 152 / 940.
 
 **Phase 1 — correctness bugs, small and independent**
 U2, U3, U4, P3, P7, P9, and the `$` fix in S7.
