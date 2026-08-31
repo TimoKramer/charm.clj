@@ -1,0 +1,507 @@
+# charm.clj — Improvement Plan
+
+Findings from a full review of `src/` (~5.5k lines), the examples, docs and CI,
+plus a review of what changed in JLine since the project started (3.30.6 →
+4.3.1, the current 4.x tip). Everything here was verified by running it:
+benchmarks, escape-injection probes, the test suite (152 tests / 940 assertions,
+all passing at time of review), and `javap` inspection of the local
+`jline-terminal-4.3.1.jar`.
+
+Ordered by impact within each section. Each item lists the evidence, the
+location, and a concrete suggestion.
+
+---
+
+## Top priorities
+
+1. **Background color detection / adaptive colors (J1)** — first thing to solve.
+   JLine 4 exposes `getDefaultBackgroundColor()` (OSC 10/11 query); wire it up
+   to offer light/dark-adaptive styling, and wire in the dormant
+   `detect-color-profile` / `downgrade-color` code while in there.
+2. **Sanitize untrusted content before it reaches the terminal**, and make
+   `strip-ansi` honest — OSC 52 injection writes attacker data into the user's
+   system clipboard. This is a real vulnerability, not a hardening nit. (S1, S2)
+3. **Rewrite the event loop** to block on the channel, drain, and render once per
+   frame — fixes the 100 msg/s ceiling and makes `:fps` real in a single change.
+   (P1, P2, P3)
+4. **Fix `:fg 240`, `:strikethrough` and `"pgup"`** — three small bugs that make
+   documented features, the library's own default styling, and Page Up/Down
+   silently do nothing. (U1, U2, U3)
+
+---
+
+## 1. Performance
+
+### P1 — Event loop caps the library at ~100 messages/second
+
+`src/charm/program.clj:242`
+
+```clojure
+(when-let [_ (a/<!! (a/timeout 10))] nil)   ; sleep 10ms every iteration
+(when-let [m (a/poll! msg-chan)] ...)       ; then handle exactly ONE message
+```
+
+Every keystroke, mouse-motion event and command result waits up to 10 ms, and
+only one is drained per tick. Pasting 300 characters takes 3 seconds. `:mouse
+:all` generates motion events far faster than they drain. `msg-chan` is
+`(chan 256)` and the input thread uses `a/put!`, which throws once 1024 puts are
+pending.
+
+**Suggestion:** block on `a/alts!!` over `msg-chan` (plus a frame-tick channel),
+then drain everything available before rendering.
+
+### P2 — `:fps` does nothing
+
+Documented in the README and in `run`'s docstring, stored at
+`src/charm/render/core.clj:29`, never read anywhere. There is no frame
+coalescing: every single message triggers a full `view` + `render!`.
+
+**Suggestion:** fold into P1 — drain all pending messages → run `update` for each
+→ render once per frame tick. One change fixes both the input ceiling and the
+render amplification.
+
+### P3 — No skip-render on unchanged state
+
+`src/charm/program.clj:263-268`. A message that leaves state identical still
+re-runs `view` and `Display.update`.
+
+**Suggestion:** `(when-not (identical? new-state old-state) (render! ...))`.
+
+### P4 — Every line is ANSI-parsed twice per frame
+
+`render!` calls `scr/truncate-line` (→ `w/string-width` →
+`AttributedString/fromAnsi`) and then `AttributedString/fromAnsi` again on the
+result.
+
+Measured on 40×80 styled lines: **140 µs → 102 µs** (~27%) by parsing once and
+using `.columnLength` / `.columnSubSequence`.
+
+**Suggestion:** parse each line to an `AttributedString` once in `render!` and
+truncate on that.
+
+### P5 — The styling stack round-trips through ANSI strings at every layer
+
+`style/render` → `pad` → `align-*` → `apply-border` → `margin`, each re-measuring
+each line with a fresh `fromAnsi`.
+
+| operation | cost |
+|---|---|
+| `string-width`, one 80-col styled line | 4.2 µs |
+| bordered + padded 20-line box | 164 µs |
+| `join-horizontal`, 4 blocks of 20×80 | 218 µs |
+
+A dashboard doing a few joins plus borders is already a meaningful slice of a
+16.7 ms frame, and the cost scales with layout depth rather than content size.
+
+The escape hatch already exists — `src/charm/style/core.clj:161`
+`attributed-string` — but nothing in `charm.style.layout`, `charm.style.border`
+or any component uses it.
+
+**Suggestion:** keep `AttributedString` as the currency through the layout stack
+and serialise only at `render!`. This is the one structural change with real
+headroom; do it after P1–P4, which are cheap and independent.
+
+### P6 — Blocking work runs on core.async's dispatch pool
+
+`src/charm/program.clj:73-90`. `:cmd` and `:sequence` invoke user functions
+inside `go` blocks. `go` blocks must not block; the pool is 8 threads.
+
+`doc/examples/src/examples/download.clj:38` calls `Thread/sleep 50` inside a
+`:cmd` — i.e. the documented pattern is exactly the wrong one. A handful of
+concurrent sleeping or IO-bound commands starves the pool and freezes the UI.
+
+**Suggestion:** use `a/thread` for `:cmd` and `:sequence` bodies.
+
+### P7 — Full-vector copies per frame
+
+`src/charm/components/viewport.clj:255` and `src/charm/render/core.clj:187` both
+do `(subvec (vec lines) …)`. `lines` is already a vector from `str/split-lines`,
+so `(vec …)` copies the entire content on every render. A viewport over a large
+log is O(total lines) per frame instead of O(visible).
+
+**Suggestion:** drop the `(vec …)`.
+
+### P8 — Input thread can busy-spin
+
+`src/charm/program.clj:143-146` catches and discards every exception inside
+`(while @running? …)` with no backoff. A persistently failing reader pins a core
+at 100%.
+
+**Suggestion:** count consecutive failures, back off, and bail out after a
+threshold.
+
+### P9 — Reflection on hot paths
+
+- `src/charm/style/overlay.clj:48,51,57` — per line, per overlay
+- `src/charm/input/keymap.clj:134`
+- `src/charm/render/core.clj:199`
+
+Also `w/pad-right` / `w/pad-left` build padding via `(apply str (repeat n char))`,
+called per line per frame throughout layout.
+
+**Suggestion:** add type hints; enable `*warn-on-reflection*` in the test alias so
+regressions get caught.
+
+---
+
+## 2. Security
+
+The threat model that matters here is *a TUI rendering data its user didn't
+author* — filenames, log lines, HTTP responses. That is precisely what the
+file-browser and download examples do.
+
+### S1 — Untrusted content reaches the terminal as OSC and DCS escapes
+
+Verified end to end: these survive both `strip-ansi` and the
+`AttributedString/fromAnsi` render path unchanged.
+
+| injected into displayed text | result |
+|---|---|
+| `ESC ] 52 ; c ; <base64> BEL` | **writes attacker data into the user's system clipboard** (iTerm2, kitty, foot, wezterm, tmux with `set-clipboard`) |
+| `ESC ] 2 ; … BEL` | rewrites the terminal window/tab title |
+| `ESC ] 8 ; ; <url> BEL` | injects a hyperlink — visible text says one thing, the link goes elsewhere |
+| `ESC P … ESC \` (DCS) | passes through untouched |
+| `ESC [ 2K CR` | erases the line and rewrites it — content can hide what it just displayed |
+
+Highest-severity item. `AttributedString/fromAnsi` is an SGR parser, not a
+sanitizer, and it is currently the only thing between untrusted input and the
+terminal.
+
+**Suggestion:** add `charm.ansi/sanitize` that keeps SGR and drops
+OSC/DCS/APC/PM/SOS, C1, and C0 other than `\n` / `\t`. Apply it in `render!` by
+default, with an opt-out for content the app authored itself.
+
+### S2 — `strip-ansi` doesn't strip
+
+`src/charm/ansi/width.clj:13`. It is the function anyone displaying untrusted
+data will reach for, and it leaves everything in S1 intact. It also *mangles*
+private CSI rather than removing it: `ESC [ ?1049h` comes out as the visible
+text `1049h`.
+
+**Suggestion:** make it exhaustive as part of S1.
+
+### S3 — Width measurement is wrong for unrecognised escapes
+
+`"file" ESC "]2;PWNED" BEL ".txt"` measures **14** but displays **8**. Every
+downstream decision — truncate, pad, border, join, overlay — is then computed
+from a wrong number, so injected content also breaks the frame.
+
+**Suggestion:** falls out of S1 once sanitisation happens before measurement.
+
+### S4 — `set-window-title` doesn't escape its argument
+
+`src/charm/render/screen.clj:52`. A BEL or ESC in the title terminates the OSC
+early and lets the caller's string open a new one. Verified: title
+`"hi" ESC "]52;c;ZXZpbA=="` emits two OSCs, the second a clipboard write.
+
+`copy-to-clipboard` (`src/charm/render/screen.clj:59`) is likewise unbounded —
+terminals cap OSC 52 payloads and truncate silently.
+
+**Suggestion:** strip control characters from the title; document and enforce a
+size cap on the clipboard payload.
+
+### S5 — Signal handlers are registered and never restored
+
+`src/charm/program.clj:228,233`. `run`'s `finally` restores terminal attributes
+but not the WINCH/INT handlers. `Signals/register` returns the previous handler;
+nothing captures it.
+
+In a REPL — which the README actively promotes — Ctrl+C stays hijacked after a
+program exits, feeding a closure that puts into a closed channel, so SIGINT is
+silently swallowed for the rest of the session.
+
+**Suggestion:** capture the return value of `Signals/register` and restore it in
+the `finally`.
+
+### S6 — No shutdown hook
+
+`finally` covers exceptions but not `System/exit` or SIGTERM. The terminal is
+left in raw mode, cursor hidden, alt-screen active.
+`doc/examples/src/examples/timer.clj:198` calls `System/exit 1` from inside a
+running program, so this is reachable from the repo's own code.
+
+**Suggestion:** register a shutdown hook that restores attributes, shows the
+cursor and exits the alt screen.
+
+### S7 — CI supply chain
+
+`.github/workflows/ci.yml`:
+
+- `bash <(curl https://raw.githubusercontent.com/babashka/babashka/master/install)`
+  executes an unpinned script from a moving branch.
+- Actions are pinned by tag, not commit SHA — including third-party
+  `DeLaGuardo/setup-clojure@13.4`.
+- The `release` job holds `CLOJARS_PASSWORD` with `contents: write` and fires on
+  every push to `main`.
+- `git config set user.email GIT_COMMITTER_EMAIL` is missing a `$` — it sets the
+  literal string, not the secret.
+
+**Suggestion:** pin actions by SHA, pin the babashka installer to a tag, and fix
+the `$`. Consider gating release on a tag rather than every push to `main`.
+
+---
+
+## 3. Usability
+
+### U1 — `:fg 240` silently does nothing
+
+`doc/api/styling.md:198` documents it as "ANSI 256 shorthand", but
+`src/charm/style/color.clj:118` dispatches on `(:type color)`, which is `nil` for
+an integer, and returns the style unchanged. Verified:
+`(style/render (style/style :fg 240) "hi")` → `"hi"`, no escapes.
+
+Used in the library's own defaults — `src/charm/components/text_input.clj:97`
+(placeholder) and `src/charm/components/list.clj:305` (item descriptions) — and
+in ~15 places across docs and examples. So a documented feature, the library's
+default styling, and most of the sample code all render as plain text.
+
+**Suggestion:** coerce integers and keywords to colour maps in `style` /
+`with-fg` / `with-bg`, or throw on an unrecognised colour value.
+
+### U2 — `:strikethrough` silently does nothing
+
+Documented in the `doc/api/styling.md:32` options table, used in
+`doc/examples/src/examples/todos.clj:20`, never applied by
+`style->attributed-style` (`src/charm/style/core.clj:143`).
+
+**Suggestion:** add it to the `cond->`, and audit the docs table against that
+function for anything else missing.
+
+### U3 — `"pgup"` / `"pgdown"` never match — Page Up/Down is dead in four components
+
+Key events carry `:key :page-up`; `key-match?` compares against
+`(name :page-up)` = `"page-up"`. Verified:
+`(msg/key-match? (msg/key-press :page-up) "pgup")` → `false`.
+
+Affects `src/charm/components/viewport.clj:29-30`,
+`src/charm/components/list.clj:24-25`,
+`src/charm/components/table.clj:28-29`,
+`src/charm/components/paginator.clj:20-21`.
+
+**Suggestion:** rename the bindings to `"page-up"` / `"page-down"`, or accept
+aliases in `key-match?`. Add a test that asserts every default binding string in
+every component resolves against a real key event — this class of bug is
+otherwise invisible.
+
+### U4 — `(style :padding 3)` throws
+
+`render` passes the raw value to `expand-box-values` →
+`UnsupportedOperationException: count not supported on this type: Long`.
+`with-padding` normalizes a bare number; the `style` constructor doesn't, so the
+two entry points disagree.
+
+`hex` (`src/charm/style/color.clj:96`) likewise throws a raw
+`NumberFormatException` on bad input rather than an `ex-info`.
+
+**Suggestion:** normalize in `style`, and wrap `hex` parse failures in `ex-info`
+with the offending string.
+
+### U5 — Bracketed paste is built but never wired up
+
+`src/charm/render/core.clj:146-154` has the enable/disable calls and
+`src/charm/input/keymap.clj:79-80` binds `:paste-start` / `:paste-end` — but
+`run` has no option and never enables it. So pastes arrive as individual
+keystrokes (throttled to 100/s by P1), and the markers are indistinguishable
+from typed input.
+
+**Suggestion:** add a `:bracketed-paste` option, enable it in `start!`, and
+coalesce everything between the markers into a single paste message.
+
+### U6 — Ctrl+C is intercepted and turned into a key message
+
+`src/charm/program.clj:233`. If the app's `update` doesn't handle `"ctrl+c"`, the
+program cannot be killed from the keyboard.
+
+**Suggestion:** make it an option, default to quitting unless the app opts in,
+and document it prominently either way.
+
+### U7 — Overflowing views are truncated from the top
+
+`src/charm/render/core.clj:184` keeps the *last* `height` lines. Sensible inline;
+surprising full-screen, where a view one line too tall silently loses its title.
+
+**Suggestion:** document it, and make the direction configurable.
+
+### U8 — Component IDs are `(rand-int 1000000)`
+
+`src/charm/components/list.clj:88`, `src/charm/components/text_input.clj:79`,
+`src/charm/components/viewport.clj:66`. ~1% collision chance at 150 components,
+and it makes component state non-reproducible in tests.
+
+**Suggestion:** a counter or `gensym`.
+
+### U9 — Two overlapping key-matching APIs
+
+`msg/key-match?` and `keys/key-matches?`, with different pattern semantics
+operating on different data shapes (message vs. event map).
+
+**Suggestion:** collapse to one; keep `msg/key-match?` as the public entry point.
+
+### U10 — `style` returns all 17 keys defaulted
+
+So `merge`ing a variant onto a base overwrites with `nil` / `false` instead of
+inheriting. There is no `merge-style` / `inherit`, which is the first thing
+anyone building a theme reaches for.
+
+**Suggestion:** add `merge-style` that ignores unset keys, or stop defaulting
+every key in the constructor.
+
+### U11 — Nothing auto-sizes to the terminal
+
+Every component takes `:height 0` = unbounded, so each app hand-threads
+window-size arithmetic. `doc/examples/src/examples/file_browser.clj:85-93` spends
+real code on `chrome-height` bookkeeping.
+
+**Suggestion:** a "fill remaining space" affordance would remove a lot of
+per-app boilerplate.
+
+---
+
+## 4. JLine 4.x adoption
+
+The project started on JLine 3.30.6 (2026-01), moved to 4.0.10/4.0.12 (April —
+the Mode 2027 grapheme work, ADR 007), and sits on 4.3.1 (July) — verified to be
+the current tip of the 4.x line (3.30.16 is a maintenance backport on the old
+branch). So the version is current; these items are 4.x capabilities the
+library doesn't use yet, plus behavior changes to be aware of.
+
+Already absorbed: Mode 2027 grapheme clustering (ADR 007), the 4.3.1 ReDoS
+guards, 4.1's `Display.update()` optimizations, and the shift+tab CSI Z binding
+(done in-repo, `aa6a75e` — JLine still doesn't bind it).
+
+### J1 — Background color detection / adaptive colors  ← do this first
+
+JLine 4 can query the terminal's actual default colors (OSC 10/11):
+
+```java
+terminal.getDefaultBackgroundColor()   ; -> int RGB, or -1 if unknown
+terminal.getDefaultForegroundColor()
+terminal.getPalette()                  ; -> ColorPalette
+```
+
+This is the primitive lipgloss uses for `HasDarkBackground` — light/dark
+adaptive styling is one of the most-requested TUI features and charm.clj
+currently has no way to do it.
+
+Related dormant code: `charm.style.color` already contains
+`detect-color-profile` and `downgrade-color`, and **nothing calls either**
+(verified by grep). JLine 4 also detects true-color from `COLORTERM` natively.
+
+**Suggestion:**
+- Add `charm.terminal/dark-background?` (query `getDefaultBackgroundColor`,
+  compute luminance, sensible default when the query returns -1).
+- Add an adaptive color type: `{:type :adaptive :light <color> :dark <color>}`,
+  resolved at render time against the detected background.
+- Wire `detect-color-profile` + `downgrade-color` into the render path (or
+  delegate profile detection to JLine's `ColorPalette`) so ANSI-only terminals
+  degrade instead of getting raw true-color escapes.
+- Expose the resolved profile/background on the program state (e.g. an
+  `:environment` msg at startup) so apps can branch on it.
+- Note the interaction with U1: fixing integer-color coercion first avoids
+  building adaptive colors on top of a constructor that silently drops ints.
+
+### J2 — `KeyEvent` / `KeyParser`: revisit ADR 004
+
+`org.jline.terminal.KeyParser/parse` (static, non-blocking — none of ADR 004's
+BindingReader objections apply) returns a structured `KeyEvent`: type
+(Character/Arrow/Function/Special/Unknown), `EnumSet` of Shift/Alt/Control,
+raw sequence. This API did not exist when ADR 004 was written and overlaps
+heavily with the ~500 hand-rolled lines in `charm.input.keys` +
+`charm.input.keymap` (including the generated xterm modifier table).
+
+**Suggestion:** spike — run the corpus from `test/charm/input/keys_test.clj`
+through `KeyParser.parse` and diff coverage. If it covers the table, delete
+code; if not, document the gap in ADR 004 and keep the keymap.
+
+### J3 — `ScreenTerminal` for integration tests
+
+`org.jline.utils.ScreenTerminal` (consolidated 4.2, scrollback + cell decoding
+exposed 4.3.0) is a full in-memory VT emulator: `write` the renderer's output,
+then assert on the resulting screen grid via `dump` / `getHistory` and per-cell
+accessors (`cellCodePoint`, `cellBold`, `cellFg`, …).
+
+The current integration-test pattern (ADR 003: dumb terminal +
+`ByteArrayOutputStream`) asserts on raw escape bytes, which breaks whenever
+`Display`'s diffing strategy changes even though the screen is identical.
+Asserting on final screen cells tests what the user actually sees, and could
+absorb some VHS visual tests without the ffmpeg/ttyd CI machinery (currently
+commented out in `ci.yml`).
+
+**Suggestion:** add a test helper that renders a frame into a `ScreenTerminal`
+and returns the grid; migrate the brittle byte-level assertions; update ADR 003.
+
+### J4 — `Terminal.trackMouse` now covers SGR
+
+`MouseSupport` in 4.3.1 emits `?1005/?1006/?1015` (verified in the jar), so
+ADR 004's era gap is closed. `trackMouse(MouseTracking/{Off,Normal,Button,Any})`
+maps 1:1 onto charm's `nil/:normal/:cell/:all` and could replace the raw escape
+writes in `src/charm/render/core.clj:96-120`; `readMouseEvent(String)` accepts
+the already-read prefix, addressing the "detect the prefix first" objection.
+JLine then also cleans up mouse state on `close()`.
+
+**Suggestion:** replace enable/disable with `trackMouse`; keep the custom SGR
+*parsing* (it works and is tested).
+
+### J5 — Terminal graphics: images (Kitty / iTerm2 / Sixel)
+
+4.0 added `TerminalGraphicsManager` with runtime protocol detection and
+one-call display (`isGraphicsSupported`, `displayImage(terminal, file)`).
+A genuine feature opportunity — image support Bubble Tea core doesn't have.
+
+Caveats: lives in the `impl` package (weaker stability guarantees) and depends
+on `java.awt.BufferedImage` — expect unavailable on babashka and extra config
+for native-image (`isJavaDesktopAvailable` guard exists for graceful
+degradation).
+
+**Suggestion:** optional `charm.components.image` guarded by
+`isGraphicsSupported`; document the platform matrix.
+
+### J6 — Signal handling: migrate to `Terminal.handle`
+
+JLine 4 modernized signals (4.1 FFM `sigaction`, 4.2 ISIG restoration, 4.3
+PosixSysTerminal interception). charm uses the static
+`org.jline.utils.Signals/register` (`src/charm/program.clj:228,233`);
+`Terminal.handle(Signal, SignalHandler)` is the supported route **and returns
+the previous handler** — exactly what S5 needs to restore Ctrl+C after exit.
+
+**Suggestion:** fix S5 by migrating to `Terminal.handle`, one change for both.
+
+### J7 — Behavior changes to be aware of
+
+- **Terminals throw when used after close** (4.0 breaking change; 3.x was
+  silent). `run`'s cleanup ordering is fine, but `run-async`'s `:quit!` racing
+  a late `render!` against `term/close` would now throw. Audit alongside S5/S6.
+- 4.1.2/4.1.3 fixed alt-screen cursor positioning and raw-mode ISIG behavior —
+  any local workarounds can be removed.
+- New sibling modules `jline-prompt` / `jline-components` / `jline-shell` (4.0):
+  JLine growing its own UI story. Nothing to adopt, worth watching as
+  overlapping ecosystem.
+- **Kitty keyboard protocol (CSI u): not in JLine** as of 4.3.1 — the xterm
+  modifier table in `keymap.clj` remains necessary; disambiguated keys
+  (Shift+Enter etc.) would need an in-repo implementation.
+
+---
+
+## Suggested sequencing
+
+**Phase 0 — background color detection (J1)**
+First thing to solve. Do U1 (integer-color coercion) as its opening step so
+adaptive colors aren't built on a constructor that silently drops ints.
+
+**Phase 1 — correctness bugs, small and independent**
+U2, U3, U4, P3, P7, P9, and the `$` fix in S7.
+
+**Phase 2 — security**
+S1 + S2 + S3 together (one sanitiser), then S4, S5 via J6, S6. Pin CI actions
+(S7). Audit the close-race from J7.
+
+**Phase 3 — event loop**
+P1 + P2 as one change, then P6, P8. U5 and U6 land naturally on top.
+
+**Phase 4 — rendering architecture**
+P4, then P5 (`AttributedString` through the layout stack). Largest change,
+biggest headroom, best done once the loop above is stable.
+
+**Phase 5 — JLine adoption + API ergonomics**
+J3 (ScreenTerminal tests — can also be pulled earlier, it's independent),
+J2 spike, J4, J5. U7, U8, U9, U10, U11.
