@@ -220,6 +220,42 @@ Requires `:focus-reporting true` in run options.
     [state nil]))
 ```
 
+## Environment Messages
+
+### environment
+
+```clojure
+(msg/environment color-profile dark-background?)
+```
+
+Sent once at startup by `charm/run`, describing the terminal it detected:
+
+| key | value |
+|---|---|
+| `:color-profile` | `:ascii`, `:ansi`, `:ansi256`, or `:true-color` |
+| `:dark-background?` | whether the terminal background is dark |
+
+Colors are already resolved against both for you — see
+[Color Profiles](styling.md) and `charm/adaptive`. This message is for apps
+that want to branch on the environment themselves, for example to pick an
+ASCII fallback for box-drawing characters.
+
+### environment?
+
+```clojure
+(msg/environment? msg) ; => boolean
+```
+
+```clojure
+(defn update-fn [state msg]
+  (cond
+    (msg/environment? msg)
+    [(assoc state :dark? (:dark-background? msg)) nil]
+
+    :else
+    [state nil]))
+```
+
 ## Quit and Error Messages
 
 ### quit

@@ -166,6 +166,38 @@ Create an ANSI 256 color (0-255).
 - 16-231: 6x6x6 color cube
 - 232-255: Grayscale ramp
 
+#### adaptive
+
+```clojure
+(charm/adaptive light-color dark-color)
+```
+
+Create a color that resolves against the terminal's background: `light-color`
+is used on light backgrounds, `dark-color` on dark ones.
+
+```clojure
+(charm/style :fg (charm/adaptive (charm/hex "#333333")
+                                 (charm/hex "#dddddd")))
+```
+
+The background is detected once at startup by `charm/run` (OSC 11), and
+reported to your app as an [`:environment` message](messages.md). When the
+terminal doesn't answer the query, charm assumes a dark background.
+
+### Color Profiles
+
+`charm/run` detects the terminal's color profile at startup and downgrades
+colors to fit it, so the same styles work everywhere:
+
+| profile | detected when | colors become |
+|---|---|---|
+| `:true-color` | `COLORTERM` is `truecolor` or `24bit` | unchanged |
+| `:ansi256` | `TERM` contains `256color` | nearest of the 256 palette |
+| `:ansi` | any other `TERM` | nearest of the 16 basic colors |
+| `:ascii` | `TERM` unset or `dumb` | dropped entirely |
+
+Outside of `charm/run` — in tests or scripts — colors are not downgraded.
+
 ### Predefined Colors
 
 ```clojure
@@ -195,7 +227,9 @@ charm/bright-white
 (charm/style :fg charm/red)
 (charm/style :fg (charm/rgb 255 128 0))
 (charm/style :fg (charm/hex "#ff8000"))
-(charm/style :fg 240)  ; ANSI 256 shorthand
+(charm/style :fg 240)        ; ANSI 256 shorthand
+(charm/style :fg :red)       ; ANSI 16 name shorthand
+(charm/style :fg "#ff8000")  ; hex string shorthand
 
 ;; Background color
 (charm/style :bg charm/blue)
