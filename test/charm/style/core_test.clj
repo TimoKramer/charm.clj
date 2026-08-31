@@ -5,6 +5,21 @@
             [charm.style.border :as b]
             [clojure.string :as str]))
 
+(deftest color-shorthand-render-test
+  (testing "integer :fg renders as ANSI 256"
+    (is (str/includes? (s/render (s/style :fg 240) "hi") "\u001b[38;5;240m")))
+
+  (testing "keyword and hex string colors render"
+    (is (str/includes? (s/render (s/style :fg :red) "hi") "\u001b[31m"))
+    (is (str/includes? (s/render (s/style :fg "#ff0000") "hi") "\u001b[")))
+
+  (testing "adaptive colors resolve against the background"
+    (let [st (s/style :fg (s/adaptive c/black c/white))]
+      (binding [c/*dark-background?* true]
+        (is (str/includes? (s/render st "hi") "\u001b[37m")))
+      (binding [c/*dark-background?* false]
+        (is (str/includes? (s/render st "hi") "\u001b[30m"))))))
+
 (deftest style-creation-test
   (testing "creates style with defaults"
     (let [st (s/style)]

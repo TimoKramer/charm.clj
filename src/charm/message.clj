@@ -59,6 +59,18 @@
    :ctrl ctrl
    :shift shift})
 
+(defn environment
+  "Create an environment message describing the terminal.
+   Sent once at program startup so apps can branch on the environment.
+
+   Keys:
+     :color-profile    - :ascii, :ansi, :ansi256, or :true-color
+     :dark-background? - whether the terminal background is dark"
+  [color-profile dark-background?]
+  {:type :environment
+   :color-profile color-profile
+   :dark-background? dark-background?})
+
 (defn focus
   "Create a focus gained message."
   []
@@ -102,6 +114,11 @@
   "Check if message is a mouse event."
   [msg]
   (= :mouse (:type msg)))
+
+(defn environment?
+  "Check if message is an environment message."
+  [msg]
+  (= :environment (:type msg)))
 
 (defn focus?
   "Check if message is a focus event."

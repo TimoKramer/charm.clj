@@ -4,7 +4,8 @@
    Supports:
    - ANSI 16 basic colors (0-15)
    - ANSI 256 extended palette (0-255)
-   - True color RGB (24-bit)"
+   - True color RGB (24-bit)
+   - Adaptive colors that resolve against the terminal background"
   (:require
    [clojure.string :as str])
   (:import
@@ -19,8 +20,16 @@
   #{:ascii :ansi :ansi256 :true-color})
 
 (def ^:dynamic *color-profile*
-  "Current color profile. Default is true-color."
+  "Current color profile. Default is true-color.
+   Bound by charm.program/run from the detected terminal profile;
+   colors are downgraded to this profile at render time."
   :true-color)
+
+(def ^:dynamic *dark-background?*
+  "Whether the terminal background is dark. Default is true.
+   Bound by charm.program/run from the detected terminal background;
+   adaptive colors resolve against this at render time."
+  true)
 
 (defn detect-color-profile
   "Detect terminal color profile from environment.
@@ -110,42 +119,31 @@
   []
   {:type :none})
 
-;; ---------------------------------------------------------------------------
-;; Color Application (via JLine AttributedStyle)
-;; ---------------------------------------------------------------------------
+(defn adaptive
+  "Create an adaptive color that resolves against the terminal background:
+   `light` is used on light backgrounds, `dark` on dark backgrounds.
 
-(defn apply-color-fg
-  "Apply foreground color to an AttributedStyle."
-  ^AttributedStyle [^AttributedStyle style color]
-  (if (or (nil? color) (= :none (:type color)))
-    style
-    (case (:type color)
-      :ansi    (.foreground style (int (:code color)))
-      :ansi256 (.foreground style (int (:code color)))
-      :rgb     (.foreground style (int (:r color)) (int (:g color)) (int (:b color)))
-      style)))
+   (adaptive (hex \"#333333\") (hex \"#dddddd\"))"
+  [light dark]
+  {:type :adaptive :light light :dark dark})
 
-(defn apply-color-bg
-  "Apply background color to an AttributedStyle."
-  ^AttributedStyle [^AttributedStyle style color]
-  (if (or (nil? color) (= :none (:type color)))
-    style
-    (case (:type color)
-      :ansi    (.background style (int (:code color)))
-      :ansi256 (.background style (int (:code color)))
-      :rgb     (.background style (int (:r color)) (int (:g color)) (int (:b color)))
-      style)))
+(defn coerce-color
+  "Coerce a color value to a color map. Accepts:
+   - color maps (returned unchanged)
+   - integers: ANSI 256 codes, e.g. 240
+   - keywords: ANSI 16 color names, e.g. :red, :bright-blue
+   - strings: hex colors, e.g. \"#ff0000\"
 
-(defn styled-str
-  "Create a styled string with foreground and/or background color.
-   Returns the string with ANSI escape sequences applied."
-  [text & {:keys [fg bg]}]
-  (if (and (nil? fg) (nil? bg))
-    text
-    (let [style (-> AttributedStyle/DEFAULT
-                    (apply-color-fg fg)
-                    (apply-color-bg bg))]
-      (.toAnsi (AttributedString. ^String text style)))))
+   Returns nil for nil; throws ex-info on unrecognised values."
+  [color]
+  (cond
+    (nil? color) nil
+    (and (map? color) (:type color)) color
+    (integer? color) (ansi256 color)
+    (and (keyword? color) (contains? ansi-colors color)) (ansi color)
+    (string? color) (hex color)
+    :else (throw (ex-info (str "Unrecognised color value: " (pr-str color))
+                          {:color color}))))
 
 ;; ---------------------------------------------------------------------------
 ;; Color Conversion
@@ -173,6 +171,38 @@
       ;; Map to 6x6x6 color cube
       (ansi256 (+ 16 (* 36 cube-r) (* 6 cube-g) cube-b)))))
 
+(def ^:private cube-levels
+  "The six channel levels of the ANSI 256 color cube."
+  [0 95 135 175 215 255])
+
+(defn ansi256->rgb
+  "Convert an ANSI 256 color to its RGB value."
+  [{:keys [code]}]
+  (cond
+    ;; 0-15: standard colors, from the hex table
+    (< code 16) (hex (nth ansi-hex code))
+
+    ;; 232-255: grayscale ramp
+    (>= code 232) (let [v (+ 8 (* 10 (- code 232)))]
+                    (rgb v v v))
+
+    ;; 16-231: 6x6x6 color cube
+    :else (let [idx (- code 16)]
+            (rgb (nth cube-levels (quot idx 36))
+                 (nth cube-levels (mod (quot idx 6) 6))
+                 (nth cube-levels (mod idx 6))))))
+
+(defn rgb->ansi16
+  "Convert RGB to the nearest ANSI 16 color by distance in RGB space."
+  [{:keys [r g b]}]
+  (let [distance (fn [hex-str]
+                   (let [{hr :r hg :g hb :b} (hex hex-str)]
+                     (+ (* (- r hr) (- r hr))
+                        (* (- g hg) (- g hg))
+                        (* (- b hb) (- b hb)))))]
+    (ansi (first (apply min-key second
+                        (map-indexed (fn [i h] [i (distance h)]) ansi-hex))))))
+
 (defn downgrade-color
   "Downgrade a color to fit a color profile."
   [color profile]
@@ -180,8 +210,8 @@
     :ascii (no-color)
     :ansi (case (:type color)
             :ansi color
-            :ansi256 (ansi (mod (:code color) 16))
-            :rgb (ansi (mod (:code (rgb->ansi256 color)) 16))
+            :ansi256 (rgb->ansi16 (ansi256->rgb color))
+            :rgb (rgb->ansi16 color)
             color)
     :ansi256 (case (:type color)
                (:ansi :ansi256) color
@@ -189,6 +219,56 @@
                color)
     :true-color color
     color))
+
+(defn resolve-color
+  "Resolve a color value for rendering: coerce it to a color map, pick the
+   light or dark variant of adaptive colors against *dark-background?*, and
+   downgrade it to *color-profile*. Returns nil for nil."
+  [color]
+  (when-let [color (coerce-color color)]
+    (-> (if (= :adaptive (:type color))
+          (coerce-color (if *dark-background?* (:dark color) (:light color)))
+          color)
+        (downgrade-color *color-profile*))))
+
+;; ---------------------------------------------------------------------------
+;; Color Application (via JLine AttributedStyle)
+;; ---------------------------------------------------------------------------
+
+(defn apply-color-fg
+  "Resolve a color value and apply it as foreground to an AttributedStyle."
+  ^AttributedStyle [^AttributedStyle style color]
+  (let [color (resolve-color color)]
+    (if (or (nil? color) (= :none (:type color)))
+      style
+      (case (:type color)
+        :ansi    (.foreground style (int (:code color)))
+        :ansi256 (.foreground style (int (:code color)))
+        :rgb     (.foreground style (int (:r color)) (int (:g color)) (int (:b color)))
+        style))))
+
+(defn apply-color-bg
+  "Resolve a color value and apply it as background to an AttributedStyle."
+  ^AttributedStyle [^AttributedStyle style color]
+  (let [color (resolve-color color)]
+    (if (or (nil? color) (= :none (:type color)))
+      style
+      (case (:type color)
+        :ansi    (.background style (int (:code color)))
+        :ansi256 (.background style (int (:code color)))
+        :rgb     (.background style (int (:r color)) (int (:g color)) (int (:b color)))
+        style))))
+
+(defn styled-str
+  "Create a styled string with foreground and/or background color.
+   Returns the string with ANSI escape sequences applied."
+  [text & {:keys [fg bg]}]
+  (if (and (nil? fg) (nil? bg))
+    text
+    (let [style (-> AttributedStyle/DEFAULT
+                    (apply-color-fg fg)
+                    (apply-color-bg bg))]
+      (.toAnsi (AttributedString. ^String text style)))))
 
 ;; ---------------------------------------------------------------------------
 ;; Convenience Colors

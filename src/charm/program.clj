@@ -12,6 +12,7 @@
    [charm.input.keymap :as km]
    [charm.message :as msg]
    [charm.render.core :as render]
+   [charm.style.color :as color]
    [charm.terminal :as term]
    [clojure.core.async :as a :refer [>! chan close! go]])
   (:import
@@ -183,7 +184,11 @@
 
    The init function should return [initial-state cmd] or just initial-state.
    The update function receives (state msg) and returns [new-state cmd].
-   Commands are optional and can be nil."
+   Commands are optional and can be nil.
+
+   At startup an :environment message with the detected :color-profile and
+   :dark-background? is sent, and both are bound for the duration of the
+   program so colors resolve against the actual terminal."
   [{:keys [init update view running?] :as opts}]
   (let [opts (merge (default-opts) opts)
         {:keys [alt-screen mouse focus-reporting fps hide-cursor]} opts
@@ -191,6 +196,12 @@
         ;; Create terminal and save original attributes for restoration
         terminal (term/create-terminal)
         ^Attributes original-attrs (term/enter-raw-mode terminal)
+
+        ;; Detect the environment for adaptive styling. The background query
+        ;; reads the terminal's OSC response, so it must happen before the
+        ;; input loop starts consuming input.
+        color-profile (color/detect-color-profile)
+        dark-background? (term/dark-background? terminal)
 
         ;; Create renderer
         renderer (render/create-renderer terminal
@@ -212,105 +223,110 @@
                                    [init-result nil])
         state (atom initial-state)]
 
-    (try
-      ;; Setup renderer
-      (render/start! renderer)
+    (binding [color/*color-profile* color-profile
+              color/*dark-background?* dark-background?]
+      (try
+        ;; Setup renderer
+        (render/start! renderer)
 
-      ;; Setup mouse
-      (when mouse
-        (render/enable-mouse! renderer mouse))
+        ;; Setup mouse
+        (when mouse
+          (render/enable-mouse! renderer mouse))
 
-      ;; Setup focus reporting
-      (when focus-reporting
-        (render/enable-focus-reporting! renderer))
+        ;; Setup focus reporting
+        (when focus-reporting
+          (render/enable-focus-reporting! renderer))
 
-      ;; Handle window resize signal
-      (Signals/register "WINCH"
-                        (reify Runnable
-                          (run [_]
-                            (check-window-size! terminal msg-chan last-size))))
+        ;; Handle window resize signal
+        (Signals/register "WINCH"
+                          (reify Runnable
+                            (run [_]
+                              (check-window-size! terminal msg-chan last-size))))
 
-      (Signals/register "INT"
-                        (reify Runnable
-                          (run [_]
-                            (a/put! msg-chan (msg/key-press "c" :ctrl true)))))
+        (Signals/register "INT"
+                          (reify Runnable
+                            (run [_]
+                              (a/put! msg-chan (msg/key-press "c" :ctrl true)))))
 
-      ;; Check initial window size
-      (check-window-size! terminal msg-chan last-size)
+        ;; Check initial window size
+        (check-window-size! terminal msg-chan last-size)
 
-      ;; Start input loop (returns thread)
-      (let [^Thread input-thread (start-input-loop! terminal msg-chan running?)]
+        ;; Tell the app about the terminal environment
+        (a/put! msg-chan (msg/environment color-profile dark-background?))
 
-        ;; Execute init command
-        (execute-cmd! init-cmd msg-chan)
+        ;; Start input loop (returns thread)
+        (let [^Thread input-thread (start-input-loop! terminal msg-chan running?)]
 
-        ;; Render initial view
-        (render/render! renderer (view @state))
+          ;; Execute init command
+          (execute-cmd! init-cmd msg-chan)
 
-        ;; Main event loop
-        (loop []
-          (when @running?
-            (when-let [_ (a/<!! (a/timeout 10))]
-              ;; Timeout - just continue
-              nil)
+          ;; Render initial view
+          (render/render! renderer (view @state))
 
-            (when-let [m (a/poll! msg-chan)]
-              (cond
-                ;; Quit message
-                (msg/quit? m)
-                (reset! running? false)
+          ;; Main event loop
+          (loop []
+            (when @running?
+              (when-let [_ (a/<!! (a/timeout 10))]
+                ;; Timeout - just continue
+                nil)
 
-                ;; Error message
-                (= :error (:type m))
-                (do
+              (when-let [m (a/poll! msg-chan)]
+                (cond
+                  ;; Quit message
+                  (msg/quit? m)
                   (reset! running? false)
-                  (throw (:error m)))
 
-                ;; Window size
-                (= :window-size (:type m))
-                (do
-                  (render/update-size! renderer (:width m) (:height m))
+                  ;; Error message
+                  (= :error (:type m))
+                  (do
+                    (reset! running? false)
+                    (throw (:error m)))
+
+                  ;; Window size
+                  (= :window-size (:type m))
+                  (do
+                    (render/update-size! renderer (:width m) (:height m))
+                    (let [[new-state cmd] (update @state m)]
+                      (reset! state new-state)
+                      (execute-cmd! cmd msg-chan)
+                      (render/render! renderer (view new-state))))
+
+                  ;; Regular message
+                  :else
                   (let [[new-state cmd] (update @state m)]
                     (reset! state new-state)
                     (execute-cmd! cmd msg-chan)
-                    (render/render! renderer (view new-state))))
+                    (render/render! renderer (view new-state)))))
 
-                ;; Regular message
-                :else
-                (let [[new-state cmd] (update @state m)]
-                  (reset! state new-state)
-                  (execute-cmd! cmd msg-chan)
-                  (render/render! renderer (view new-state)))))
+              (when @running?
+                (recur))))
 
-            (when @running?
-              (recur))))
+          ;; Interrupt input thread
+          (.interrupt input-thread))
 
-        ;; Interrupt input thread
-        (.interrupt input-thread))
+        ;; Return final state
+        @state
 
-      ;; Return final state
-      @state
+        (finally
+          ;; Cleanup
+          (reset! running? false)
+          (close! msg-chan)
 
-      (finally
-        ;; Cleanup
-        (reset! running? false)
-        (close! msg-chan)
+          ;; Disable mouse
+          (render/disable-mouse! renderer)
 
-        ;; Disable mouse
-        (render/disable-mouse! renderer)
+          ;; Disable focus reporting
+          (when focus-reporting
+            (render/disable-focus-reporting! renderer))
 
-        ;; Disable focus reporting
-        (when focus-reporting
-          (render/disable-focus-reporting! renderer))
+          ;; Stop renderer
+          (render/stop! renderer)
 
-        ;; Stop renderer
-        (render/stop! renderer)
+          ;; Restore terminal attributes before closing
+          (term/set-attributes terminal original-attrs)
 
-        ;; Restore terminal attributes before closing
-        (term/set-attributes terminal original-attrs)
-
-        ;; Close terminal
-        (term/close terminal)))))
+          ;; Close terminal
+          (term/close terminal))))))
 
 ;; ---------------------------------------------------------------------------
 ;; Async Run

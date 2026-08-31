@@ -29,6 +29,38 @@
   [^Terminal terminal ^Attributes attrs]
   (.setAttributes terminal attrs))
 
+(defn default-foreground-color
+  "Get the terminal's default foreground color as a 0xRRGGBB int,
+   or nil if it cannot be determined."
+  [^Terminal terminal]
+  (let [color (.getDefaultForegroundColor terminal)]
+    (when-not (neg? color) color)))
+
+(defn default-background-color
+  "Get the terminal's default background color as a 0xRRGGBB int,
+   or nil if it cannot be determined. Queries the terminal (OSC 11)
+   where supported, so call this before reading terminal input."
+  [^Terminal terminal]
+  (let [color (.getDefaultBackgroundColor terminal)]
+    (when-not (neg? color) color)))
+
+(defn dark-color?
+  "True when a 0xRRGGBB color int is dark (luminance below 50%)."
+  [rgb]
+  (let [r (bit-and (unsigned-bit-shift-right rgb 16) 0xff)
+        g (bit-and (unsigned-bit-shift-right rgb 8) 0xff)
+        b (bit-and rgb 0xff)]
+    (< (+ (* 0.299 r) (* 0.587 g) (* 0.114 b)) 127.5)))
+
+(defn dark-background?
+  "True when the terminal's default background is dark.
+   Defaults to true when the background cannot be determined,
+   since dark terminal themes are the common case."
+  [^Terminal terminal]
+  (if-let [bg (default-background-color terminal)]
+    (dark-color? bg)
+    true))
+
 (defn get-size
   "Get terminal dimensions as {:width cols :height rows}."
   [^Terminal terminal]

@@ -117,3 +117,14 @@
     (is (msg/wheel? (msg/mouse :wheel-up :none 10 20)))
     (is (msg/wheel? (msg/mouse :wheel-down :none 10 20)))
     (is (not (msg/wheel? (msg/mouse :press :left 10 20))))))
+
+(deftest environment-test
+  (testing "creates environment message"
+    (let [m (msg/environment :ansi256 true)]
+      (is (= :environment (:type m)))
+      (is (= :ansi256 (:color-profile m)))
+      (is (true? (:dark-background? m)))))
+
+  (testing "environment? predicate"
+    (is (msg/environment? (msg/environment :true-color false)))
+    (is (not (msg/environment? (msg/quit))))))

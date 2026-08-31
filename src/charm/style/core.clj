@@ -21,7 +21,8 @@
   "Create a style map.
 
    Options:
-     ;; Colors
+     ;; Colors (a color map, an ANSI 256 int like 240, an ANSI 16
+     ;; name keyword like :red, or a hex string like \"#ff8000\")
      :fg         - Foreground color
      :bg         - Background color
 
@@ -252,6 +253,7 @@
 (def hex c/hex)
 (def ansi c/ansi)
 (def ansi256 c/ansi256)
+(def adaptive c/adaptive)
 
 ;; Common colors
 (def black c/black)

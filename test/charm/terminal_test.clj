@@ -36,6 +36,27 @@
         (finally
           (term/close t))))))
 
+(deftest dark-color?-test
+  (testing "dark colors are detected by luminance"
+    (is (term/dark-color? 0x000000))
+    (is (term/dark-color? 0x1e1e2e))
+    (is (not (term/dark-color? 0xffffff)))
+    (is (not (term/dark-color? 0xfafafa))))
+
+  (testing "luminance weights green heaviest"
+    (is (not (term/dark-color? 0x00ff00)))
+    (is (term/dark-color? 0x0000ff))))
+
+(deftest dark-background?-test
+  (testing "returns a boolean, true when the background is unknown"
+    ;; In non-interactive environments JLine creates a dumb terminal,
+    ;; which cannot answer the OSC 11 background query.
+    (let [t (term/create-terminal)]
+      (try
+        (is (boolean? (term/dark-background? t)))
+        (finally
+          (term/close t))))))
+
 (deftest reader-writer-test
   (testing "get-reader returns non-nil"
     (let [t (term/create-terminal)]
