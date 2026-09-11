@@ -1,7 +1,8 @@
 (ns charm.program-test
   (:require [clojure.test :refer [deftest is testing]]
             [charm.program :as p]
-            [charm.message :as msg]))
+            [charm.message :as msg]
+            [charm.style.color :as color]))
 
 ;; Note: Full program tests require terminal interaction.
 ;; These tests focus on command and message helper functions.
@@ -48,3 +49,16 @@
       (is (= :window-size (:type m)))
       (is (= 80 (:width m)))
       (is (= 24 (:height m))))))
+
+(deftest resolve-color-profile-test
+  (let [resolve-profile #'p/resolve-color-profile]
+    (testing "a pinned profile is used as given"
+      (doseq [profile color/color-profiles]
+        (is (= profile (resolve-profile profile)))))
+
+    (testing "nil detects from the environment"
+      (is (contains? color/color-profiles (resolve-profile nil))))
+
+    (testing "an unknown profile throws, naming the value"
+      (let [e (is (thrown? clojure.lang.ExceptionInfo (resolve-profile :256color)))]
+        (is (= :256color (:color-profile (ex-data e))))))))

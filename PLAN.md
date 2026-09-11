@@ -415,8 +415,13 @@ Related dormant code: `charm.style.color` already contains
 - `run` detects profile and background once at startup, binds
   `*color-profile*` / `*dark-background?*` around the event loop, and sends an
   `:environment` message so apps can branch themselves.
-- Documented in `doc/api/styling.md` (adaptive colors, profile table) and
-  `doc/api/messages.md` (`:environment`).
+- `:color-profile` and `:dark-background?` are `run` options; `nil` (the
+  default) detects. Pinning `:dark-background?` also skips the OSC 11 query and
+  its probe timeout. An unknown profile throws rather than silently passing
+  through `downgrade-color`'s `case` default.
+- Documented in `doc/api/styling.md` (adaptive colors, profile table, pinning),
+  `doc/api/program.md` (both options) and `doc/api/messages.md`
+  (`:environment`).
 
 **Two premises above turned out to be wrong, and are worth recording:**
 
@@ -440,10 +445,41 @@ Related dormant code: `charm.style.color` already contains
    cube and the grayscale ramp. Orange now lands on bright yellow, with a
    regression test pinning it.
 
-**Caveat for the Phase 3/4 loop rewrite:** `*color-profile*` and
-`*dark-background?*` are thread-local. The current single-threaded render path is
-fine, but a `view` that renders parts on other threads would not see them —
-`bound-fn` or explicit conveyance would be needed.
+**The dynamic vars are the interim mechanism, and Phase 4 retires them.**
+
+`resolve-color` needs the profile four frames below anything that was handed the
+state:
+
+```
+(view state) → (list-view (:list state)) → (style/render item-style title) → resolve-color
+```
+
+`style/render` returns a finished `String` with escapes already in it, so the
+"is this terminal true-color?" decision is made down there, in a function whose
+signature is `(style & strings)`. Dynamic vars are the standard answer to that,
+and the alternative — threading an environment argument through every
+`xxx-view` — is viral across the whole component API.
+
+The exit is to stop resolving eagerly: `style/render` returns styled *data*, and
+the renderer, which already holds the terminal, resolves colors when it emits.
+No ambient value, no threading. That is the same change premise 1 above needs —
+real `38;2;r;g;b` output requires the `toAnsi` overload that takes a `Terminal`,
+which only the renderer has — so the two should land together. It breaks user
+code that concatenates styled strings (`(str (style/render …) "more")`), which
+is why it belongs with the Phase 4 render work and not here.
+
+Two smaller things deliberately left alone until then, both invisible today:
+
+1. `init` is called in `run`'s `let`, before the `binding` opens, so styling
+   done at init time resolves against the root values. No component's `init`
+   styles anything, so only user code that pre-renders styled strings in its
+   own `init` can reach it.
+2. The vars are thread-local. core.async's `go` conveys the binding frame, so
+   commands are fine; a `view` that renders parts on app-owned threads or
+   futures is not.
+
+Both disappear with the renderer-owned environment, so fixing them now would be
+wasted work.
 
 ### J2 — `KeyEvent` / `KeyParser`: revisit ADR 004
 

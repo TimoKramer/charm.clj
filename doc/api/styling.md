@@ -196,6 +196,15 @@ colors to fit it, so the same styles work everywhere:
 | `:ansi` | any other `TERM` | nearest of the 16 basic colors |
 | `:ascii` | `TERM` unset or `dumb` | dropped entirely |
 
+Both halves of the environment can be pinned, for a terminal that misreports
+itself or a test that needs a fixed environment:
+
+```clojure
+(charm/run {:init ... :update ... :view ...
+            :color-profile :ansi256
+            :dark-background? false})
+```
+
 Outside of `charm/run` — in tests or scripts — colors are not downgraded.
 
 ### Predefined Colors

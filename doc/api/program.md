@@ -24,6 +24,14 @@ Run a TUI program with the Elm Architecture pattern.
 | `:focus-reporting` | boolean | `false` | Report focus in/out events |
 | `:fps` | int | `60` | Frames per second |
 | `:hide-cursor` | boolean | `true` | Hide terminal cursor |
+| `:color-profile` | keyword | `nil` | `:ascii`, `:ansi`, `:ansi256` or `:true-color`; `nil` detects from `TERM`/`COLORTERM` |
+| `:dark-background?` | boolean | `nil` | `nil` queries the terminal |
+
+The last two pin the [color environment](styling.md#color-profiles) instead of
+detecting it, for a terminal that misreports itself or a test that needs a fixed
+environment. Pinning `:dark-background?` also skips the OSC 11 background query,
+and with it the probe timeout that a terminal which never answers costs at every
+startup.
 
 **Example:**
 

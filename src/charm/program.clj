@@ -63,7 +63,20 @@
    :mouse nil  ; nil, :normal, :cell, or :all
    :focus-reporting false
    :fps 60
-   :hide-cursor true})
+   :hide-cursor true
+   :color-profile nil    ; nil - detect from the environment
+   :dark-background? nil})  ; nil - query the terminal
+
+(defn- resolve-color-profile
+  "Use a caller-supplied color profile, or detect one from the environment.
+   Throws an ex-info naming the value for an unknown profile."
+  [profile]
+  (cond
+    (nil? profile) (color/detect-color-profile)
+    (contains? color/color-profiles profile) profile
+    :else (throw (ex-info (str "Unknown color profile: " (pr-str profile))
+                          {:color-profile profile
+                           :valid color/color-profiles}))))
 
 ;; ---------------------------------------------------------------------------
 ;; Event Loop
@@ -181,14 +194,21 @@
      :fps           - Frames per second (default: 60)
      :hide-cursor   - Hide cursor (default: true)
      :running?      - Atom to control the event loop externally (default: internal atom)
+     :color-profile - :ascii, :ansi, :ansi256 or :true-color, overriding
+                      detection (default: nil, detect from $TERM/$COLORTERM)
+     :dark-background? - Override the terminal background query (default: nil,
+                      query the terminal)
 
    The init function should return [initial-state cmd] or just initial-state.
    The update function receives (state msg) and returns [new-state cmd].
    Commands are optional and can be nil.
 
-   At startup an :environment message with the detected :color-profile and
-   :dark-background? is sent, and both are bound for the duration of the
-   program so colors resolve against the actual terminal."
+   At startup an :environment message with the :color-profile and
+   :dark-background? in effect is sent, and both are bound for the duration of
+   the program so colors resolve against the actual terminal. Pinning either
+   option skips its detection; pinning :dark-background? also skips the
+   terminal background query, and with it the probe timeout that terminals
+   which never answer would otherwise cost at every startup."
   [{:keys [init update view running?] :as opts}]
   (let [opts (merge (default-opts) opts)
         {:keys [alt-screen mouse focus-reporting fps hide-cursor]} opts
@@ -197,11 +217,13 @@
         terminal (term/create-terminal)
         ^Attributes original-attrs (term/enter-raw-mode terminal)
 
-        ;; Detect the environment for adaptive styling. The background query
-        ;; reads the terminal's OSC response, so it must happen before the
-        ;; input loop starts consuming input.
-        color-profile (color/detect-color-profile)
-        dark-background? (term/dark-background? terminal)
+        ;; Detect the environment for adaptive styling, unless the caller
+        ;; pinned it. The background query reads the terminal's OSC response,
+        ;; so it must happen before the input loop starts consuming input.
+        color-profile (resolve-color-profile (:color-profile opts))
+        dark-background? (if (some? (:dark-background? opts))
+                           (:dark-background? opts)
+                           (term/dark-background? terminal))
 
         ;; Create renderer
         renderer (render/create-renderer terminal
