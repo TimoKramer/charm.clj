@@ -194,6 +194,9 @@ colors to fit it, so the same styles work everywhere:
 | `:true-color` | `COLORTERM` is `truecolor` or `24bit` | unchanged |
 | `:ansi256` | `TERM` contains `256color` | nearest of the 256 palette |
 | `:ansi` | any other `TERM` | nearest of the 16 basic colors |
+
+Nearest is JLine's `org.jline.utils.Colors`, which measures distance in CIE Lab
+rather than RGB space.
 | `:ascii` | `TERM` unset or `dumb` | dropped entirely |
 
 Both halves of the environment can be pinned, for a terminal that misreports

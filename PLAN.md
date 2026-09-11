@@ -423,7 +423,7 @@ Related dormant code: `charm.style.color` already contains
   `doc/api/program.md` (both options) and `doc/api/messages.md`
   (`:environment`).
 
-**Two premises above turned out to be wrong, and are worth recording:**
+**Three premises above turned out to be wrong, and are worth recording:**
 
 1. *"ANSI-only terminals get raw true-color escapes."* They never did — and
    neither does anything else. `AttributedString.toAnsi()` called without a
@@ -440,10 +440,40 @@ Related dormant code: `charm.style.color` already contains
    orange `(rgb 255 128 0)` came out **cyan**. Harmless while nothing called it,
    but wiring it in would have turned every RGB color on a `TERM=xterm` terminal
    into an effectively random one of 16 — worse than the previous
-   pass-everything-through behavior. Replaced with a nearest-neighbour match
-   against the existing `ansi-hex` table, plus a new `ansi256->rgb` covering the
-   cube and the grayscale ramp. Orange now lands on bright yellow, with a
-   regression test pinning it.
+   pass-everything-through behavior.
+
+   It was first replaced with a hand-rolled nearest-neighbour match, which was
+   the wrong instinct — see premise 3.
+
+3. *All of the color conversion was JLine's already, and our copies were worse.*
+   `org.jline.utils.Colors` offers `rgbColor(int)` (palette index → RGB),
+   `roundColor(idx, max)` and `roundRgbColor(r, g, b, max)`, matching in CIE Lab
+   via `Colors$Distance`, over `DEFAULT_COLORS_256`. Measured against it:
+
+   - `ansi256->rgb` was identical to `Colors/rgbColor` on every probe — pure
+     duplication.
+   - `rgb->ansi16` agreed on 5 of 6 probes; ours measured distance in RGB space.
+   - `rgb->ansi256` was **strictly worse in 73 of 125 probes**, for two reasons:
+     it only searched the 16–231 cube and the 232–255 ramp, so exact matches in
+     the first 16 entries were missed (olive `(128,128,0)` *is* entry 3; we
+     returned 142), and it quantised as `(v*5/255)` as if the cube levels were
+     evenly spaced when they are 0/95/135/175/215/255, so 128 became 175 rather
+     than 95.
+
+   Worse, wiring `downgrade-color` into `apply-color-fg` *took this job away
+   from JLine*, which had been doing it correctly all along: before the wiring,
+   `apply-color-fg` passed raw RGB to `.foreground` and JLine's `toAnsi` chose
+   208 for orange; after it, our matcher chose 214 and JLine merely printed it.
+
+   `downgrade-color` now delegates to `Colors`, and the three conversion
+   functions plus `ansi-hex` and `cube-levels` are deleted. The `:ansi` profile
+   keeps the one thing the wiring genuinely gained — basic SGR codes
+   (`ESC[91m`) instead of a 256-color code, which no-terminal `toAnsi` will not
+   emit.
+
+   Still ours, because JLine has no equivalent: `coerce-color` (ints, keywords,
+   hex) and `adaptive`. Also still ours, but duplicating terminfo `max_colors`:
+   `detect-color-profile`.
 
 **The dynamic vars are the interim mechanism, and Phase 4 retires them.**
 

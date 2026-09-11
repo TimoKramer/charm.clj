@@ -111,42 +111,6 @@
     (binding [c/*color-profile* :ascii]
       (is (= "x" (c/styled-str "x" :fg (c/rgb 255 0 0)))))))
 
-(deftest rgb->ansi256-test
-  (testing "converts RGB to ANSI 256"
-    ;; Pure red should map to color cube
-    (let [result (c/rgb->ansi256 {:r 255 :g 0 :b 0})]
-      (is (= :ansi256 (:type result))))
-    ;; Gray should map to grayscale ramp
-    (let [result (c/rgb->ansi256 {:r 128 :g 128 :b 128})]
-      (is (= :ansi256 (:type result)))
-      (is (>= (:code result) 232)))))  ; Grayscale starts at 232
-
-(deftest ansi256->rgb-test
-  (testing "converts standard colors"
-    (is (= {:type :rgb :r 0 :g 0 :b 0} (c/ansi256->rgb (c/ansi256 0))))
-    (is (= {:type :rgb :r 255 :g 0 :b 0} (c/ansi256->rgb (c/ansi256 9)))))
-
-  (testing "converts the 6x6x6 cube"
-    ;; 196 is the cube's pure red corner
-    (is (= {:type :rgb :r 255 :g 0 :b 0} (c/ansi256->rgb (c/ansi256 196))))
-    (is (= {:type :rgb :r 0 :g 0 :b 0} (c/ansi256->rgb (c/ansi256 16)))))
-
-  (testing "converts the grayscale ramp"
-    (is (= {:type :rgb :r 8 :g 8 :b 8} (c/ansi256->rgb (c/ansi256 232))))
-    (is (= {:type :rgb :r 238 :g 238 :b 238} (c/ansi256->rgb (c/ansi256 255))))))
-
-(deftest rgb->ansi16-test
-  (testing "maps colors to the nearest ANSI 16 entry"
-    (is (= c/black (c/rgb->ansi16 (c/rgb 0 0 0))))
-    (is (= c/bright-red (c/rgb->ansi16 (c/rgb 255 0 0))))
-    (is (= c/bright-green (c/rgb->ansi16 (c/rgb 0 255 0))))
-    (is (= c/bright-white (c/rgb->ansi16 (c/rgb 255 255 255)))))
-
-  (testing "orange lands on a warm color, not an arbitrary one"
-    ;; Regression: (mod code 16) used to turn orange into cyan
-    (is (contains? #{c/yellow c/red c/bright-red c/bright-yellow}
-                   (c/rgb->ansi16 (c/rgb 255 128 0))))))
-
 (deftest downgrade-color-test
   (testing ":ansi downgrade preserves hue"
     (is (contains? #{c/yellow c/red c/bright-red c/bright-yellow}
@@ -160,6 +124,16 @@
   (testing ":ansi256 downgrades RGB only"
     (is (= :ansi256 (:type (c/downgrade-color (c/rgb 255 128 0) :ansi256))))
     (is (= c/red (c/downgrade-color c/red :ansi256))))
+
+  (testing ":ansi256 searches the basic 16 entries too"
+    ;; Olive is exactly entry 3. The old cube-only search returned 142.
+    (is (= (c/ansi256 3) (c/downgrade-color (c/rgb 128 128 0) :ansi256)))
+    (is (= (c/ansi256 5) (c/downgrade-color (c/rgb 128 0 128) :ansi256))))
+
+  (testing ":ansi256 picks the nearest cube entry, not an evenly-spaced guess"
+    ;; The cube levels are 0/95/135/175/215/255, not multiples of 51: the old
+    ;; (v*5/255) quantisation rounded 128 up to 175 and returned 214.
+    (is (= (c/ansi256 208) (c/downgrade-color (c/rgb 255 128 0) :ansi256))))
 
   (testing ":ascii drops all color"
     (is (= {:type :none} (c/downgrade-color (c/rgb 255 128 0) :ascii))))

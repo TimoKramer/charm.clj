@@ -9,7 +9,7 @@
   (:require
    [clojure.string :as str])
   (:import
-   [org.jline.utils AttributedString AttributedStyle]))
+   [org.jline.utils AttributedString AttributedStyle Colors]))
 
 ;; ---------------------------------------------------------------------------
 ;; Color Profile Detection
@@ -74,11 +74,6 @@
    :bright-magenta 13
    :bright-cyan 14
    :bright-white 15})
-
-(def ansi-hex
-  "ANSI 16 colors as hex values for conversion."
-  ["#000000" "#800000" "#008000" "#808000" "#000080" "#800080" "#008080" "#c0c0c0"
-   "#808080" "#ff0000" "#00ff00" "#ffff00" "#0000ff" "#ff00ff" "#00ffff" "#ffffff"])
 
 ;; ---------------------------------------------------------------------------
 ;; Color Construction
@@ -149,73 +144,23 @@
 ;; Color Conversion
 ;; ---------------------------------------------------------------------------
 
-(defn rgb->ansi256
-  "Convert RGB to closest ANSI 256 color."
-  [{:keys [r g b]}]
-  (let [;; Check grayscale first (232-255)
-        gray-start 232
-        gray-levels 24
-        gray? (and (< (Math/abs (long (- r g))) 10)
-                   (< (Math/abs (long (- g b))) 10)
-                   (< (Math/abs (long (- r b))) 10))
-
-        ;; Convert to 6x6x6 color cube (16-231)
-        cube-value (fn [v] (int (Math/round (/ (* v 5.0) 255.0))))
-        cube-r (cube-value r)
-        cube-g (cube-value g)
-        cube-b (cube-value b)]
-    (if gray?
-      ;; Map to grayscale ramp
-      (let [gray-idx (int (Math/round (* (/ (+ r g b) 3.0 255.0) (dec gray-levels))))]
-        (ansi256 (+ gray-start gray-idx)))
-      ;; Map to 6x6x6 color cube
-      (ansi256 (+ 16 (* 36 cube-r) (* 6 cube-g) cube-b)))))
-
-(def ^:private cube-levels
-  "The six channel levels of the ANSI 256 color cube."
-  [0 95 135 175 215 255])
-
-(defn ansi256->rgb
-  "Convert an ANSI 256 color to its RGB value."
-  [{:keys [code]}]
-  (cond
-    ;; 0-15: standard colors, from the hex table
-    (< code 16) (hex (nth ansi-hex code))
-
-    ;; 232-255: grayscale ramp
-    (>= code 232) (let [v (+ 8 (* 10 (- code 232)))]
-                    (rgb v v v))
-
-    ;; 16-231: 6x6x6 color cube
-    :else (let [idx (- code 16)]
-            (rgb (nth cube-levels (quot idx 36))
-                 (nth cube-levels (mod (quot idx 6) 6))
-                 (nth cube-levels (mod idx 6))))))
-
-(defn rgb->ansi16
-  "Convert RGB to the nearest ANSI 16 color by distance in RGB space."
-  [{:keys [r g b]}]
-  (let [distance (fn [hex-str]
-                   (let [{hr :r hg :g hb :b} (hex hex-str)]
-                     (+ (* (- r hr) (- r hr))
-                        (* (- g hg) (- g hg))
-                        (* (- b hb) (- b hb)))))]
-    (ansi (first (apply min-key second
-                        (map-indexed (fn [i h] [i (distance h)]) ansi-hex))))))
-
 (defn downgrade-color
-  "Downgrade a color to fit a color profile."
-  [color profile]
+  "Downgrade a color to fit a color profile.
+
+   Nearest-color matching is JLine's (`org.jline.utils.Colors`), which searches
+   the whole 256-color table — the 16 basic entries included — and measures
+   distance in CIE Lab rather than RGB space."
+  [{:keys [type code r g b] :as color} profile]
   (case profile
     :ascii (no-color)
-    :ansi (case (:type color)
+    :ansi (case type
             :ansi color
-            :ansi256 (rgb->ansi16 (ansi256->rgb color))
-            :rgb (rgb->ansi16 color)
+            :ansi256 (ansi (Colors/roundColor (int code) 16))
+            :rgb (ansi (Colors/roundRgbColor (int r) (int g) (int b) 16))
             color)
-    :ansi256 (case (:type color)
+    :ansi256 (case type
                (:ansi :ansi256) color
-               :rgb (rgb->ansi256 color)
+               :rgb (ansi256 (Colors/roundRgbColor (int r) (int g) (int b) 256))
                color)
     :true-color color
     color))
