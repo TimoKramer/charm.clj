@@ -97,9 +97,17 @@ The escape hatch already exists — `src/charm/style/core.clj:161`
 `attributed-string` — but nothing in `charm.style.layout`, `charm.style.border`
 or any component uses it.
 
-**Suggestion:** keep `AttributedString` as the currency through the layout stack
-and serialise only at `render!`. This is the one structural change with real
-headroom; do it after P1–P4, which are cheap and independent.
+**Suggestion:** stop round-tripping — carry one representation through the layout
+stack and serialise only at `render!`. This is the one structural change with
+real headroom; do it after P1–P4, which are cheap and independent.
+
+Which representation is [ADR 008](adr/008-styling-currency.md): spans as plain
+Clojure data rather than `AttributedString`, because `AttributedStyle` holds
+already-resolved colors and so would keep `*dark-background?*` alive, and
+because `(str attributed-string)` drops styling *silently* — the dominant idiom
+in charm's own examples. Same rewrite either way; the data version additionally
+retires both dynamic vars and lands true color at the same boundary. The ADR
+carries the sequencing.
 
 ### P6 — Blocking work runs on core.async's dispatch pool
 
@@ -490,8 +498,9 @@ signature is `(style & strings)`. Dynamic vars are the standard answer to that,
 and the alternative — threading an environment argument through every
 `xxx-view` — is viral across the whole component API.
 
-The exit is to stop resolving eagerly: `style/render` returns styled *data*, and
-the renderer, which already holds the terminal, resolves colors when it emits.
+The exit is [ADR 008](adr/008-styling-currency.md): `style/render` builds styled
+*data*, and the renderer, which already holds the terminal, resolves colors when
+it emits.
 No ambient value, no threading. That is the same change premise 1 above needs —
 real `38;2;r;g;b` output requires the `toAnsi` overload that takes a `Terminal`,
 which only the renderer has — so the two should land together. It breaks user
@@ -598,8 +607,10 @@ the previous handler** — exactly what S5 needs to restore Ctrl+C after exit.
 **Phase 0 — background color detection (J1)** — **done**
 U1 (integer-color coercion) landed as its opening step, so adaptive colors
 aren't built on a constructor that silently drops ints. Also fixed
-`downgrade-color`'s nearest-ANSI-16 mapping, which the wiring made reachable.
-162 tests / 994 assertions passing, up from 152 / 940.
+`downgrade-color`'s nearest-ANSI-16 mapping, which the wiring made reachable,
+and added the `:color-profile` / `:dark-background?` options so the detected
+environment can be pinned. 163 tests / 1001 assertions passing, up from
+152 / 940.
 
 **Phase 1 — correctness bugs, small and independent**
 U2, U3, U4, P3, P7, P9, and the `$` fix in S7.
@@ -612,8 +623,10 @@ S1 + S2 + S3 together (one sanitiser), then S4, S5 via J6, S6. Pin CI actions
 P1 + P2 as one change, then P6, P8. U5 and U6 land naturally on top.
 
 **Phase 4 — rendering architecture**
-P4, then P5 (`AttributedString` through the layout stack). Largest change,
-biggest headroom, best done once the loop above is stable.
+P4, then P5 (one representation through the layout stack — spans as data, see
+[ADR 008](adr/008-styling-currency.md)). Largest change, biggest headroom, best
+done once the loop above is stable. Also where premise 1 under J1 gets resolved
+and the Phase 0 dynamic vars are retired.
 
 **Phase 5 — JLine adoption + API ergonomics**
 J3 (ScreenTerminal tests — can also be pulled earlier, it's independent),
