@@ -141,7 +141,7 @@
               (str (str/join sep result) sep (render-bg (:bg hlp) ellipsis))
               (recur (conj result rendered)
                      (rest remaining)
-                     new-width)))))
+                     (long new-width))))))
       ;; No width constraint
       (str/join sep (map #(render-binding hlp %) bindings)))))
 

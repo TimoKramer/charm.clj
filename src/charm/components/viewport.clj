@@ -254,7 +254,8 @@
         ;; Determine visible range
         visible-lines (if (or (zero? height) (<= total height))
                         lines
-                        (subvec (vec lines) y-offset
+                        ;; :lines is always a vector, so no copy is needed
+                        (subvec lines y-offset
                                 (min total (+ y-offset height))))
         ;; Apply width constraint
         visible-lines (if (pos? width)

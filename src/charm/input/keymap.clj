@@ -130,7 +130,7 @@
 (defn- bind-key!
   "Bind a sequence to an event in the keymap.
    Sequence should be WITHOUT the ESC prefix (e.g., \"[A\" not \"\\e[A\")."
-  [^KeyMap keymap seq event]
+  [^KeyMap keymap ^CharSequence seq event]
   (.bind keymap event seq))
 
 (defn- bind-from-capability!

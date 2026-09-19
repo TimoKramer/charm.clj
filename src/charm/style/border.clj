@@ -101,7 +101,7 @@
         (str result right-corner)
         (do
           (.append result middle)
-          (recur result (+ current-width pattern-width)))))))
+          (recur result (long (+ current-width pattern-width))))))))
 
 (defn- style-text
   "Apply foreground and background color to text."

@@ -5,7 +5,8 @@
    the terminal by only redrawing changed content."
   (:require [charm.render.screen :as scr]
             [charm.terminal :as term])
-  (:import [org.jline.terminal Terminal]
+  (:import [java.util ArrayList Collection]
+           [org.jline.terminal Terminal]
            [org.jline.utils Display AttributedString]))
 
 ;; ---------------------------------------------------------------------------
@@ -186,7 +187,7 @@
         lines (scr/content->lines content)
         ;; Truncate to height (keep last lines if overflow)
         lines (if (and (pos? height) (> (count lines) height))
-                (subvec (vec lines) (- (count lines) height))
+                (subvec lines (- (count lines) height))
                 lines)
         ;; Truncate each line to width and convert to AttributedString
         attributed (mapv (fn [line]
@@ -196,7 +197,7 @@
     ;; Display.update handles all the diffing internally.
     ;; Convert to ArrayList because JLine mutates the list internally
     ;; (e.g. calling .remove) and Clojure vectors are immutable.
-    (.update display (java.util.ArrayList. attributed) -1)))
+    (.update display (ArrayList. ^Collection attributed) -1)))
 
 (defn repaint!
   "Force a full repaint on next render."

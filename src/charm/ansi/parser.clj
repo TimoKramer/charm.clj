@@ -126,7 +126,7 @@
                 result' (if (< pos start)
                           (conj result {:type :text :content (subs s pos start)})
                           result)]
-            (recur end
+            (recur (long end)
                    (rest remaining)
                    (conj result' {:type :ansi :content raw :parsed parsed}))))))))
 

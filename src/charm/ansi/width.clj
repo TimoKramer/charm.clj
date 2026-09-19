@@ -66,13 +66,18 @@
             ""
             (str (column-sub-sequence attr-s 0 target-width) tail)))))))
 
+(defn repeat-char
+  "Build a string of `n` copies of `c`, without going through a seq."
+  ^String [c n]
+  (.repeat ^String (str c) (int n)))
+
 (defn pad-right
   "Pad a string on the right to reach a target display width."
   [s width & {:keys [char] :or {char \space}}]
   (let [current (string-width s)
         needed (- width current)]
     (if (pos? needed)
-      (str s (apply str (repeat needed char)))
+      (str s (repeat-char char needed))
       s)))
 
 (defn pad-left
@@ -81,5 +86,5 @@
   (let [current (string-width s)
         needed (- width current)]
     (if (pos? needed)
-      (str (apply str (repeat needed char)) s)
+      (str (repeat-char char needed) s)
       s)))
