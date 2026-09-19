@@ -19,7 +19,7 @@ encounter any issues.
 
 - **Elm Architecture** - Simple init/update/view pattern for predictable state management
 - **UI Components** - Spinner, text-input, list, paginator, timer, progress, help, viewport, table
-- **Styling** - Colors (ANSI, 256, true color), borders, padding, alignment
+- **Styling** - Colors (ANSI, 256, true color, adaptive light/dark), borders, padding, alignment
 - **Input handling** - Keyboard and mouse events with modifier support
 - **Efficient rendering** - Line diffing for minimal terminal updates
 - **core.async** - Asynchronous command execution
@@ -38,6 +38,7 @@ encounter any issues.
   - [Component Composition](doc/guides/component-composition.md)
   - [Styling Patterns](doc/guides/styling-patterns.md)
 - **[Examples](doc/examples/README.md)** - Runnable demo applications
+- **[Changelog](CHANGELOG.md)** - Notable changes per release
 
 ## Installation
 
@@ -94,7 +95,11 @@ Add to your `deps.edn`. Click the badges to find the latest version and git tag:
               :alt-screen false      ; Use [alternate screen buffer](#alternate-screen-buffer)
               :mouse :cell           ; Mouse mode: nil, :normal, :cell, :all
               :focus-reporting false ; Report focus in/out events
-              :fps 60})              ; Frames per second
+              :fps 60                ; Frames per second
+
+              ;; Color environment - detected from the terminal when omitted
+              :color-profile :ansi256  ; :ascii, :ansi, :ansi256 or :true-color
+              :dark-background? true}) ; Also skips the background query
 ```
 
 #### Alternate Screen Buffer
@@ -169,6 +174,8 @@ program/quit-cmd
 (style/hex "#ff6432")       ; Hex color
 (style/ansi :red)           ; ANSI 16 colors
 (style/ansi256 196)         ; 256 palette
+(style/adaptive (style/hex "#333333")
+                (style/hex "#dddddd")) ; Resolves against the background
 
 ;; Borders (require '[charm.style.border :as border])
 (style/render (style/style :border border/rounded) "boxed")
@@ -254,7 +261,7 @@ clojure -M:test
 
 - JDK 22+
 - Clojure 1.12+
-- [JLine 3](https://github.com/jline/jline3) - Terminal I/O
+- [JLine 4](https://github.com/jline/jline3) - Terminal I/O
 - [core.async](https://github.com/clojure/core.async) - Async message handling
 
 ## License
