@@ -1,7 +1,7 @@
 (ns ^:no-doc charm.terminal
   "JLine terminal wrapper for charm.clj"
   (:import [org.jline.terminal Terminal TerminalBuilder Attributes]
-           [org.jline.utils InfoCmp$Capability]))
+           [org.jline.utils InfoCmp$Capability Signals]))
 
 (defn create-terminal
   "Create a JLine terminal with system I/O and FFM as native interface."
@@ -155,3 +155,41 @@
   [^Terminal terminal]
   (.puts terminal InfoCmp$Capability/exit_ca_mode empty-args)
   (flush-output terminal))
+
+;; ---------------------------------------------------------------------------
+;; Signals
+;; ---------------------------------------------------------------------------
+
+(def signals
+  "Signal names we install handlers for, by keyword."
+  {:int "INT"
+   :quit "QUIT"
+   :tstp "TSTP"
+   :cont "CONT"
+   :winch "WINCH"})
+
+(defn handle-signal
+  "Install `f`, a no-argument function, as the handler for `signal`
+   (`:int`, `:winch`, ...).
+
+   Returns the handler it replaced, which `restore-signal!` puts back. Leaving
+   a handler installed after the program exits means a later resize or Ctrl+C
+   still reaches a closed terminal and a closed channel - which in a REPL, where
+   the process outlives the program, swallows Ctrl+C for the rest of the
+   session.
+
+   JLine 4 also offers `Terminal.handle`, which is the supported route and
+   likewise returns the previous handler, but it needs the nested
+   `Terminal$Signal` and `Terminal$SignalHandler` classes, which babashka cannot
+   resolve. This uses the static `Signals` helper, which works on both."
+  [signal f]
+  (Signals/register (get signals signal)
+                    (reify Runnable
+                      (run [_] (f)))))
+
+(defn restore-signal!
+  "Put back a handler that `handle-signal` returned."
+  [signal handler]
+  (when handler
+    (Signals/unregister (get signals signal) handler)))
+

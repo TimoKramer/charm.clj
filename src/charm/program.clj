@@ -16,8 +16,7 @@
    [charm.terminal :as term]
    [clojure.core.async :as a :refer [>! chan close! go]])
   (:import
-   [org.jline.terminal Terminal Attributes]
-   [org.jline.utils Signals]))
+   [org.jline.terminal Terminal Attributes]))
 
 ;; ---------------------------------------------------------------------------
 ;; Command Helpers
@@ -181,6 +180,42 @@
     (.start thread)
     thread))
 
+(defn- restore-terminal!
+  "Put the terminal back the way it was found - `render/stop!` covers the mouse,
+   focus reporting, the cursor and the alternate screen; the attributes are ours
+   to restore.
+
+   Runs from `run`'s finally and from the shutdown hook, so it has to tolerate
+   being called twice and after the terminal is already gone."
+  [renderer ^Terminal terminal ^Attributes original-attrs]
+  (try
+    (render/stop! renderer)
+    (term/set-attributes terminal original-attrs)
+    (catch Exception _
+      ;; Nothing useful to do while unwinding, and a terminal that is already
+      ;; closed throws on every one of these in JLine 4.
+      nil)))
+
+(defn- add-shutdown-hook!
+  "Register `f` to run on JVM shutdown, returning the thread so it can be
+   removed again.
+
+   `finally` does not cover System/exit or SIGTERM, and an example in this
+   repository calls System/exit from inside a running program - without this the
+   terminal is left in raw mode, cursor hidden, alternate screen active."
+  ^Thread [f]
+  (let [thread (Thread. ^Runnable f "charm-shutdown")]
+    (.addShutdownHook (Runtime/getRuntime) thread)
+    thread))
+
+(defn- remove-shutdown-hook!
+  [^Thread thread]
+  (try
+    (.removeShutdownHook (Runtime/getRuntime) thread)
+    (catch IllegalStateException _
+      ;; Already shutting down - the hook is running or has run.
+      nil)))
+
 (defn- check-window-size!
   "Check terminal size and send resize message if changed."
   [^Terminal terminal msg-chan last-size]
@@ -256,7 +291,14 @@
         [initial-state init-cmd] (if (vector? init-result)
                                    init-result
                                    [init-result nil])
-        state (atom initial-state)]
+        state (atom initial-state)
+
+        ;; Signal handlers we displace, so the finally can restore them
+        previous-winch (atom nil)
+        previous-int (atom nil)
+
+        shutdown-hook (add-shutdown-hook!
+                       #(restore-terminal! renderer terminal original-attrs))]
 
     (binding [color/*color-profile* color-profile
               color/*dark-background?* dark-background?]
@@ -272,16 +314,14 @@
         (when focus-reporting
           (render/enable-focus-reporting! renderer))
 
-        ;; Handle window resize signal
-        (Signals/register "WINCH"
-                          (reify Runnable
-                            (run [_]
-                              (check-window-size! terminal msg-chan last-size))))
-
-        (Signals/register "INT"
-                          (reify Runnable
-                            (run [_]
-                              (a/put! msg-chan (msg/key-press "c" :ctrl true)))))
+        ;; Handle window resize and interrupt, keeping the handlers they
+        ;; replaced so the finally can put them back
+        (reset! previous-winch
+                (term/handle-signal :winch
+                                    #(check-window-size! terminal msg-chan last-size)))
+        (reset! previous-int
+                (term/handle-signal :int
+                                    #(a/put! msg-chan (msg/key-press "c" :ctrl true))))
 
         ;; Check initial window size
         (check-window-size! terminal msg-chan last-size)
@@ -343,18 +383,14 @@
           (reset! running? false)
           (close! msg-chan)
 
-          ;; Disable mouse
-          (render/disable-mouse! renderer)
+          ;; Put back the signal handlers we displaced, before the terminal
+          ;; closes under them
+          (term/restore-signal! :winch @previous-winch)
+          (term/restore-signal! :int @previous-int)
 
-          ;; Disable focus reporting
-          (when focus-reporting
-            (render/disable-focus-reporting! renderer))
-
-          ;; Stop renderer
-          (render/stop! renderer)
-
-          ;; Restore terminal attributes before closing
-          (term/set-attributes terminal original-attrs)
+          ;; Restore the terminal, then stop guarding it
+          (restore-terminal! renderer terminal original-attrs)
+          (remove-shutdown-hook! shutdown-hook)
 
           ;; Close terminal
           (term/close terminal))))))

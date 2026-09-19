@@ -71,3 +71,27 @@
         (is (some? (term/get-writer t)))
         (finally
           (term/close t))))))
+
+(deftest signal-handling-test
+  (testing "handle-signal returns the handler it replaced, so it can be put back"
+    (let [fired (atom 0)
+          original (term/handle-signal :winch #(swap! fired inc))
+          ours (term/handle-signal :winch #(swap! fired inc))]
+      ;; The second call hands back the handler the first one installed
+      (is (some? ours))
+      (is (not= original ours))
+      (term/restore-signal! :winch original)
+      ;; Restoring put the original back, so it comes round again
+      (is (= original (term/handle-signal :winch #(swap! fired inc))))
+      (term/restore-signal! :winch original)))
+
+  (testing "restore-signal! tolerates a nil handler"
+    (is (nil? (term/restore-signal! :int nil))))
+
+  (testing "every signal name is one this platform accepts"
+    (is (= #{:int :quit :tstp :cont :winch} (set (keys term/signals))))
+    ;; JLine throws for a signal the platform does not have - INFO, for one,
+    ;; is BSD-only - so registering each in turn is the check that matters
+    (doseq [signal (keys term/signals)]
+      (let [previous (term/handle-signal signal (fn []))]
+        (is (nil? (term/restore-signal! signal previous)))))))
