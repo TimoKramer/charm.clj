@@ -51,6 +51,23 @@
     (is (msg/key-match? (msg/key-press "q") :q))
     (is (not (msg/key-match? (msg/key-press "a") :q))))
 
+  (testing "key-match? with special keys"
+    (is (msg/key-match? (msg/key-press :page-up) "page-up"))
+    (is (msg/key-match? (msg/key-press :escape) :escape))
+    (is (not (msg/key-match? (msg/key-press :page-up) "page-down"))))
+
+  (testing "key-match? accepts short spellings"
+    (is (msg/key-match? (msg/key-press :escape) "esc"))
+    (is (msg/key-match? (msg/key-press :escape) :esc))
+    (is (msg/key-match? (msg/key-press :page-up) "pgup"))
+    (is (msg/key-match? (msg/key-press :page-down) "pgdown"))
+    (is (not (msg/key-match? (msg/key-press :page-up) "pgdown"))))
+
+  (testing "key-match? with modifiers"
+    (is (msg/key-match? (msg/key-press "c" :ctrl true) "ctrl+c"))
+    (is (msg/key-match? (msg/key-press :page-up :ctrl true) "ctrl+pgup"))
+    (is (not (msg/key-match? (msg/key-press "c") "ctrl+c"))))
+
   (testing "key-match? with non-key-press"
     (is (not (msg/key-match? (msg/quit) "q")))))
 

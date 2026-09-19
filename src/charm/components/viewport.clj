@@ -26,8 +26,8 @@
    :line-down     ["down" "j"]
    :half-page-up  ["ctrl+u"]
    :half-page-down ["ctrl+d"]
-   :page-up       ["pgup"]
-   :page-down     ["pgdown"]
+   :page-up       ["page-up"]
+   :page-down     ["page-down"]
    :top           ["home" "g"]
    :bottom        ["end" "G"]})
 

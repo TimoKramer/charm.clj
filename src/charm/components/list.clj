@@ -21,8 +21,8 @@
   "Default key bindings for list navigation."
   {:cursor-up     ["up" "k" "ctrl+p"]
    :cursor-down   ["down" "j" "ctrl+n"]
-   :page-up       ["pgup" "ctrl+u"]
-   :page-down     ["pgdown" "ctrl+d"]
+   :page-up       ["page-up" "ctrl+u"]
+   :page-down     ["page-down" "ctrl+d"]
    :go-to-start   ["home" "g"]
    :go-to-end     ["end" "G"]})
 

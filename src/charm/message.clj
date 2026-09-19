@@ -134,37 +134,46 @@
 ;; Key Helpers
 ;; ---------------------------------------------------------------------------
 
+(def ^:private key-aliases
+  "Short spellings accepted in key patterns, mapped to the real key name."
+  {"esc"    "escape"
+   "pgup"   "page-up"
+   "pgdown" "page-down"})
+
+(defn- key-name
+  "The canonical name of a key pattern part, resolving short spellings."
+  [k]
+  (let [n (if (keyword? k) (name k) k)]
+    (get key-aliases n n)))
+
 (defn key-match?
   "Check if a key-press message matches the given key.
 
    Key can be:
    - A string like \"q\", \"a\" (matches character keys)
    - A keyword like :enter, :up, :tab (matches special keys)
-   - A pattern like \"ctrl+c\" (matches with modifiers)"
+   - A pattern like \"ctrl+c\" (matches with modifiers)
+
+   The short spellings \"esc\", \"pgup\" and \"pgdown\" are accepted for
+   :escape, :page-up and :page-down."
   [msg key]
   (when (key-press? msg)
-    (let [msg-key (:key msg)]
+    (let [msg-key (:key msg)
+          msg-name (if (keyword? msg-key) (name msg-key) msg-key)]
       (cond
         ;; Pattern with modifiers like "ctrl+c"
         (and (string? key) (string/includes? key "+"))
         (let [parts (string/split (string/lower-case key) #"\+")
               mods (set (butlast parts))
-              key-part (last parts)]
+              key-part (key-name (last parts))]
           (and (if (contains? mods "ctrl") (:ctrl msg) (not (:ctrl msg)))
                (if (contains? mods "alt") (:alt msg) (not (:alt msg)))
                (if (contains? mods "shift") (:shift msg) (not (:shift msg)))
-               (or (= key-part (if (keyword? msg-key) (name msg-key) msg-key))
-                   (= key-part (str msg-key)))))
+               (= key-part msg-name)))
 
-        ;; Keyword matches keyword or string
-        (keyword? key)
-        (or (= key msg-key)
-            (= (name key) msg-key))
-
-        ;; String matches string or keyword name
-        (string? key)
-        (or (= key msg-key)
-            (= key (when (keyword? msg-key) (name msg-key))))
+        ;; A key name, as a keyword (:up) or a string (\"up\", \"q\")
+        (or (keyword? key) (string? key))
+        (= (key-name key) msg-name)
 
         :else false))))
 

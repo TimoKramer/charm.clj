@@ -17,8 +17,8 @@
 ;; ---------------------------------------------------------------------------
 
 (def ^:private default-keys
-  {:next-page ["right" "l" "pgdown"]
-   :prev-page ["left" "h" "pgup"]})
+  {:next-page ["right" "l" "page-down"]
+   :prev-page ["left" "h" "page-up"]})
 
 (defn- matches-binding?
   "Check if a message matches any key in a binding."

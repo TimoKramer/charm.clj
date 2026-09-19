@@ -62,8 +62,8 @@ Check if a key press matches a specific key pattern.
 | `:escape` or `"esc"` | Escape |
 | `:home` | Home |
 | `:end` | End |
-| `:pgup` | Page Up |
-| `:pgdown` | Page Down |
+| `:page-up` or `"pgup"` | Page Up |
+| `:page-down` or `"pgdown"` | Page Down |
 | `"ctrl+c"` | Ctrl+C |
 | `"ctrl+x"` | Ctrl+X |
 | `"alt+f"` | Alt+F |
