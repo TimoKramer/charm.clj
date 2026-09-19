@@ -9,6 +9,9 @@
   lint {:doc "Lint code"
         :task (clojure "-M:lint")}
 
+  reflection {:doc "Check for reflective call sites"
+              :task (clojure "-M:reflection")}
+
   test {:doc "Run tests"
         :task (clojure "-M:test")}
 
@@ -16,4 +19,4 @@
          :task (clojure "-T:build jar")}
 
   ci {:doc "Run ci"
-      :depends [test format lint build]}}}
+      :depends [test format lint reflection build]}}}

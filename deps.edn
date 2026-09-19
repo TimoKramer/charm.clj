@@ -25,5 +25,9 @@
            :format {:extra-deps {dev.weavejester/cljfmt {:mvn/version "0.16.3"}}
                     :main-opts ["-m" "cljfmt.main" "check" "src" "test"]}
 
+           :reflection {:extra-paths ["dev"]
+                        :main-opts ["-m" "reflection"]
+                        :jvm-opts ["--enable-native-access=ALL-UNNAMED"]}
+
            :lint {:extra-deps {clj-kondo/clj-kondo {:mvn/version "2026.01.19"}}
                   :main-opts ["-m" "clj-kondo.main" "--fail-level" "error" "--lint" "src" "test"]}}}

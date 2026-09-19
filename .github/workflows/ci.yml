@@ -40,6 +40,9 @@ jobs:
       - name: Lint
         run: clj-kondo --fail-level error --lint src test
 
+      - name: Reflection check
+        run: clojure -M:reflection
+
       - name: Test
         run: clojure -M:test
 
@@ -111,5 +114,5 @@ jobs:
           GIT_COMMITTER_EMAIL: ${{ secrets.GIT_COMMITTER_EMAIL }}
         run: |
           git config set user.name "Timo Kramer"
-          git config set user.email GIT_COMMITTER_EMAIL
+          git config set user.email "$GIT_COMMITTER_EMAIL"
           clojure -T:build tag-release
