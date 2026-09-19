@@ -132,6 +132,9 @@ Create a color from hex string.
 (charm/hex "00ff80")    ; Mint green (# optional)
 ```
 
+The string must be six hex digits. Anything else throws an `ex-info` naming the
+value — `(charm/hex "red")` is an error, not an unstyled string.
+
 #### ansi
 
 ```clojure

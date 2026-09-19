@@ -30,7 +30,13 @@
 
   (testing "parses hex colors without #"
     (is (= {:type :rgb :r 255 :g 255 :b 255} (c/hex "ffffff")))
-    (is (= {:type :rgb :r 0 :g 0 :b 0} (c/hex "000000")))))
+    (is (= {:type :rgb :r 0 :g 0 :b 0} (c/hex "000000"))))
+
+  (testing "throws an ex-info naming the value, not a NumberFormatException"
+    ;; "red" used to surface as: For input string: "re" under radix 16
+    (doseq [s ["red" "#ff00" "#ff00001" "#gggggg" ""]]
+      (let [e (is (thrown? clojure.lang.ExceptionInfo (c/hex s)))]
+        (is (= s (:color (ex-data e))))))))
 
 (deftest adaptive-color-test
   (testing "creates adaptive colors"
@@ -58,7 +64,8 @@
 
   (testing "throws on unrecognised values"
     (is (thrown? clojure.lang.ExceptionInfo (c/coerce-color :no-such-color)))
-    (is (thrown? clojure.lang.ExceptionInfo (c/coerce-color 1.5)))))
+    (is (thrown? clojure.lang.ExceptionInfo (c/coerce-color 1.5)))
+    (is (thrown? clojure.lang.ExceptionInfo (c/coerce-color "red")))))
 
 (deftest resolve-color-test
   (testing "resolves adaptive colors against *dark-background?*"

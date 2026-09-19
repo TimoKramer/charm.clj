@@ -99,15 +99,20 @@
   {:type :rgb :r r :g g :b b})
 
 (defn hex
-  "Create a true color from a hex string like \"#ff0000\" or \"ff0000\"."
+  "Create a true color from a hex string like \"#ff0000\" or \"ff0000\".
+
+   Throws an ex-info naming the value for anything that isn't six hex digits."
   [hex-str]
   (let [s (if (str/starts-with? hex-str "#")
             (subs hex-str 1)
-            hex-str)
-        r (Integer/parseInt (subs s 0 2) 16)
-        g (Integer/parseInt (subs s 2 4) 16)
-        b (Integer/parseInt (subs s 4 6) 16)]
-    (rgb r g b)))
+            hex-str)]
+    (when-not (re-matches #"[0-9a-fA-F]{6}" s)
+      (throw (ex-info (str "Unrecognised color value: " (pr-str hex-str)
+                           " - hex colors are six hex digits, e.g. \"#ff0000\"")
+                      {:color hex-str})))
+    (rgb (Integer/parseInt (subs s 0 2) 16)
+         (Integer/parseInt (subs s 2 4) 16)
+         (Integer/parseInt (subs s 4 6) 16))))
 
 (defn no-color
   "Create a no-color (transparent) value."
