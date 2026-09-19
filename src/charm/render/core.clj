@@ -3,7 +3,8 @@
 
    Provides a high-level rendering API that efficiently updates
    the terminal by only redrawing changed content."
-  (:require [charm.render.screen :as scr]
+  (:require [charm.ansi.sanitize :as san]
+            [charm.render.screen :as scr]
             [charm.terminal :as term])
   (:import [java.util ArrayList Collection]
            [org.jline.terminal Terminal]
@@ -19,9 +20,12 @@
    Options:
      :fps         - Target frames per second (default: 60)
      :alt-screen  - Use alternate screen buffer (default: false)
-     :hide-cursor - Hide cursor during rendering (default: true)"
-  [^Terminal terminal & {:keys [fps alt-screen hide-cursor]
-                         :or {fps 60 alt-screen false hide-cursor true}}]
+     :hide-cursor - Hide cursor during rendering (default: true)
+     :sanitize    - Drop everything but SGR styling from rendered content
+                    (default: true)"
+  [^Terminal terminal & {:keys [fps alt-screen hide-cursor sanitize]
+                         :or {fps 60 alt-screen false hide-cursor true
+                              sanitize true}}]
   (let [{:keys [width height]} (term/get-size terminal)
         display (doto (Display. terminal false)
                   (.resize height width))]
@@ -31,6 +35,7 @@
            :alt-screen alt-screen
            :in-alt-screen false
            :hide-cursor hide-cursor
+           :sanitize sanitize
            :width width
            :height height
            :running false})))
@@ -180,10 +185,16 @@
   "Render content to the terminal using JLine's Display for efficient diffing.
 
    Content can be a string (multi-line) which will be split
-   and rendered line by line."
+   and rendered line by line.
+
+   Unless the renderer was created with `:sanitize false`, the content is
+   stripped of every escape sequence but SGR styling first. A view is usually
+   part application text and part data the application did not author, and the
+   renderer is the one place that sees all of it."
   [renderer content]
-  (let [{:keys [^Display display width height]} @renderer
+  (let [{:keys [^Display display width height sanitize]} @renderer
         content (if (empty? content) " " content)
+        content (if sanitize (san/sanitize content) content)
         lines (scr/content->lines content)
         ;; Truncate to height (keep last lines if overflow)
         lines (if (and (pos? height) (> (count lines) height))

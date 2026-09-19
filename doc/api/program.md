@@ -24,6 +24,7 @@ Run a TUI program with the Elm Architecture pattern.
 | `:focus-reporting` | boolean | `false` | Report focus in/out events |
 | `:fps` | int | `60` | Frames per second |
 | `:hide-cursor` | boolean | `true` | Hide terminal cursor |
+| `:sanitize` | boolean | `true` | Drop every escape sequence but SGR styling from the view |
 | `:color-profile` | keyword | `nil` | `:ascii`, `:ansi`, `:ansi256` or `:true-color`; `nil` detects from `TERM`/`COLORTERM` |
 | `:dark-background?` | boolean | `nil` | `nil` queries the terminal |
 
@@ -32,6 +33,32 @@ detecting it, for a terminal that misreports itself or a test that needs a fixed
 environment. Pinning `:dark-background?` also skips the OSC 11 background query,
 and with it the probe timeout that a terminal which never answers costs at every
 startup.
+
+### Untrusted content
+
+A TUI usually displays data its user did not author - filenames, log lines, HTTP
+responses. Escape sequences in that data are instructions to the terminal, not
+characters: `ESC c` resets it outright, a carriage return lets content overwrite
+what it just drew, and a private `CSI` sequence turns into visible garbage that
+also throws off every width calculation downstream.
+
+So the view is sanitized before it is written: everything but SGR styling is
+removed, along with every control character except newline and tab. Styled
+content is unaffected, and text with nothing to remove is passed through
+untouched.
+
+Set `:sanitize false` only for a view that writes its own control sequences, and
+then sanitize the untrusted parts of it yourself:
+
+```clojure
+(require '[charm.ansi.sanitize :as sanitize])
+
+(sanitize/sanitize log-line)   ; keeps styling, drops the rest
+(sanitize/strip log-line)      ; the plain text a terminal would show
+```
+
+`charm.style/strip-ansi` is `strip` under another name, so it is safe to reach
+for when displaying data from elsewhere.
 
 **Example:**
 

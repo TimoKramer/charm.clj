@@ -16,6 +16,7 @@
         (is (false? (:alt-screen @renderer)))
         (is (false? (:in-alt-screen @renderer)))
         (is (true? (:hide-cursor @renderer)))
+        (is (true? (:sanitize @renderer)))
         (is (nat-int? (:width @renderer)))
         (is (nat-int? (:height @renderer)))
         (finally
@@ -83,3 +84,47 @@
         (r/stop! renderer)
         (is (= [:enter :clear :home :exit :disable-mouse :disable-focus] @calls))
         (is (false? (:in-alt-screen @renderer)))))))
+
+(defn- render-to-bytes
+  "Render `content` into a dumb terminal and return what was written."
+  [content & opts]
+  (let [input (java.io.ByteArrayInputStream. (byte-array 0))
+        output (java.io.ByteArrayOutputStream.)
+        terminal (-> (org.jline.terminal.TerminalBuilder/builder)
+                     (.dumb true)
+                     (.streams input output)
+                     (.build))
+        renderer (apply r/create-renderer terminal opts)]
+    (try
+      (r/render! renderer content)
+      (.flush (.writer terminal))
+      (.toString output "UTF-8")
+      (finally
+        (term/close terminal)))))
+
+(deftest render-sanitizes-content-test
+  ;; JLine's own fromAnsi drops OSC, DCS and standard CSI as of 4.4.5, so the
+  ;; sequences that still reach a terminal unaided are the ones it keeps: ESC c
+  ;; (RIS, a full terminal reset), carriage return, and private CSI, which it
+  ;; turns into visible text rather than removing.
+  (testing "ESC c cannot reset the terminal"
+    (let [written (render-to-bytes "a\u001bcb")]
+      (is (re-find #"ab" written))
+      (is (not (re-find #"\u001bc" written)))))
+
+  (testing "a carriage return cannot overwrite what was just drawn"
+    (let [written (render-to-bytes "visible\rhidden")]
+      (is (not (re-find #"\r" written)))))
+
+  (testing "private CSI is removed, not turned into visible text"
+    (let [written (render-to-bytes "a\u001b[?1049hb")]
+      (is (not (re-find #"1049h" written)))))
+
+  (testing ":sanitize false lets the application write its own sequences"
+    (let [written (render-to-bytes "a\u001bcb" :sanitize false)]
+      (is (re-find #"\u001bc" written))))
+
+  (testing "styling still reaches the terminal"
+    (let [written (render-to-bytes "\u001b[31mred\u001b[0m")]
+      (is (re-find #"\u001b\[" written))
+      (is (re-find #"red" written)))))

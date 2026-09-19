@@ -63,6 +63,7 @@
    :focus-reporting false
    :fps 60
    :hide-cursor true
+   :sanitize true
    :color-profile nil    ; nil - detect from the environment
    :dark-background? nil})  ; nil - query the terminal
 
@@ -241,6 +242,11 @@
      :focus-reporting - Report focus in/out (default: false)
      :fps           - Frames per second (default: 60)
      :hide-cursor   - Hide cursor (default: true)
+     :sanitize      - Drop every escape sequence but SGR styling from the view
+                      before it reaches the terminal (default: true). Turn this
+                      off only for a view that authors its own control
+                      sequences, and then sanitize untrusted parts of it with
+                      charm.ansi.sanitize/sanitize.
      :running?      - Atom to control the event loop externally (default: internal atom)
      :color-profile - :ascii, :ansi, :ansi256 or :true-color, overriding
                       detection (default: nil, detect from $TERM/$COLORTERM)
@@ -259,7 +265,7 @@
    which never answer would otherwise cost at every startup."
   [{:keys [init update view running?] :as opts}]
   (let [opts (merge (default-opts) opts)
-        {:keys [alt-screen mouse focus-reporting fps hide-cursor]} opts
+        {:keys [alt-screen mouse focus-reporting fps hide-cursor sanitize]} opts
 
         ;; Create terminal and save original attributes for restoration
         terminal (term/create-terminal)
@@ -277,7 +283,8 @@
         renderer (render/create-renderer terminal
                                          :fps fps
                                          :alt-screen alt-screen
-                                         :hide-cursor hide-cursor)
+                                         :hide-cursor hide-cursor
+                                         :sanitize sanitize)
 
         ;; Message channel
         msg-chan (chan 256)
