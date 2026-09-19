@@ -70,3 +70,4 @@ apply.
 ### Requirements
 
 JDK 22+. Ships with JLine 4.4.5, which carries the palette fixes above.
+Babashka with JLine 4.4.5 (currently on master) for use with babashka.
