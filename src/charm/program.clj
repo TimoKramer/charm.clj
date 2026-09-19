@@ -110,6 +110,19 @@
 
       nil)))
 
+(defn- handle-msg!
+  "Run `update` for one message, execute its command and render the new view.
+
+   Skips the render when `update` returned the identical state, since the
+   frame cannot have changed."
+  [renderer update view state msg-chan m & {:keys [force-render?]}]
+  (let [old-state @state
+        [new-state cmd] (update old-state m)]
+    (reset! state new-state)
+    (execute-cmd! cmd msg-chan)
+    (when (or force-render? (not (identical? new-state old-state)))
+      (render/render! renderer (view new-state)))))
+
 (defn- start-input-loop!
   "Start reading terminal input and sending to message channel.
    Returns the thread so it can be interrupted on shutdown."
@@ -308,17 +321,13 @@
                   (= :window-size (:type m))
                   (do
                     (render/update-size! renderer (:width m) (:height m))
-                    (let [[new-state cmd] (update @state m)]
-                      (reset! state new-state)
-                      (execute-cmd! cmd msg-chan)
-                      (render/render! renderer (view new-state))))
+                    ;; The size changed, so the frame has to be redrawn even
+                    ;; if the app ignored the message.
+                    (handle-msg! renderer update view state msg-chan m :force-render? true))
 
                   ;; Regular message
                   :else
-                  (let [[new-state cmd] (update @state m)]
-                    (reset! state new-state)
-                    (execute-cmd! cmd msg-chan)
-                    (render/render! renderer (view new-state)))))
+                  (handle-msg! renderer update view state msg-chan m)))
 
               (when @running?
                 (recur))))

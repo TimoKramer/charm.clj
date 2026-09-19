@@ -2,6 +2,7 @@
   (:require [clojure.test :refer [deftest is testing]]
             [charm.program :as p]
             [charm.message :as msg]
+            [charm.render.core :as render]
             [charm.style.color :as color]))
 
 ;; Note: Full program tests require terminal interaction.
@@ -62,3 +63,31 @@
     (testing "an unknown profile throws, naming the value"
       (let [e (is (thrown? clojure.lang.ExceptionInfo (resolve-profile :256color)))]
         (is (= :256color (:color-profile (ex-data e))))))))
+
+(deftest handle-msg-test
+  (let [handle-msg! #'p/handle-msg!
+        renders (atom 0)
+        run! (fn [update state m & opts]
+               (let [state-atom (atom state)]
+                 (apply handle-msg! ::renderer update identity state-atom nil m opts)
+                 @state-atom))]
+    (with-redefs [render/render! (fn [_ _] (swap! renders inc))]
+      (testing "renders when update returns a new state"
+        (reset! renders 0)
+        (is (= {:n 1} (run! (fn [st _] [(update st :n inc) nil]) {:n 0} (msg/key-press "j"))))
+        (is (= 1 @renders)))
+
+      (testing "skips the render when update returns the state unchanged"
+        (reset! renders 0)
+        (is (= {:n 0} (run! (fn [st _] [st nil]) {:n 0} (msg/key-press "x"))))
+        (is (zero? @renders)))
+
+      (testing "an equal but not identical state still renders"
+        (reset! renders 0)
+        (run! (fn [st _] [(into {} st) nil]) {:n 0} (msg/key-press "x"))
+        (is (= 1 @renders)))
+
+      (testing "force-render? renders even when the state is unchanged"
+        (reset! renders 0)
+        (run! (fn [st _] [st nil]) {:n 0} (p/window-size-msg 80 24) :force-render? true)
+        (is (= 1 @renders))))))
