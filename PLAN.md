@@ -18,9 +18,13 @@ location, and a concrete suggestion.
    with U1. JLine 4 exposes `getDefaultBackgroundColor()` (OSC 10/11 query);
    wired up to offer light/dark-adaptive styling, with the dormant
    `detect-color-profile` / `downgrade-color` code wired in alongside.
-2. **Sanitize untrusted content before it reaches the terminal**, and make
-   `strip-ansi` honest — OSC 52 injection writes attacker data into the user's
-   system clipboard. This is a real vulnerability, not a hardening nit. (S1, S2)
+2. ~~**Sanitize untrusted content before it reaches the terminal**, and make
+   `strip-ansi` honest~~ — **done** (S1, S2, S3). The OSC 52 clipboard write
+   this was written for stopped being reachable through the render path when
+   Phase 0 bumped JLine to 4.4.5, whose `fromAnsi` drops OSC and DCS; what was
+   left, and is now fixed, is `ESC c` resetting the terminal, CR hiding content,
+   private CSI arriving as visible text, and the window title. See S1 for the
+   measurements.
 3. **Rewrite the event loop** to block on the channel, drain, and render once per
    frame — fixes the 100 msg/s ceiling and makes `:fps` real in a single change.
    (P1, P2, P3)
@@ -181,7 +185,7 @@ The threat model that matters here is *a TUI rendering data its user didn't
 author* — filenames, log lines, HTTP responses. That is precisely what the
 file-browser and download examples do.
 
-### S1 — Untrusted content reaches the terminal as OSC and DCS escapes
+### S1 — Untrusted content reaches the terminal as OSC and DCS escapes — **done**
 
 Verified end to end: these survive both `strip-ansi` and the
 `AttributedString/fromAnsi` render path unchanged.
@@ -202,7 +206,47 @@ terminal.
 OSC/DCS/APC/PM/SOS, C1, and C0 other than `\n` / `\t`. Apply it in `render!` by
 default, with an opt-out for content the app authored itself.
 
-### S2 — `strip-ansi` doesn't strip
+**Resolved, and the table above is out of date — half of it was fixed by the
+JLine bump in Phase 0, not by this.**
+
+`charm.ansi.sanitize/sanitize` does what the suggestion says, `strip` also drops
+SGR, and `strip-controls` drops control characters outright for strings that go
+inside a sequence charm writes itself. `render!` applies `sanitize` unless the
+renderer was built with `:sanitize false`, which `run` exposes as an option. A
+single scan, and the argument is returned unchanged when nothing was removed, so
+plain and already-styled text cost no allocation.
+
+**The premise that needs recording:** the table was measured against JLine
+4.3.1. Phase 0 moved to 4.4.5 for the `ColorPalette` fixes, and 4.4.5's
+`AttributedString/fromAnsi` drops OSC, DCS and standard CSI. Verified by running
+the same probes under both versions:
+
+| injected | 4.3.1 `fromAnsi` | 4.4.5 `fromAnsi` |
+|---|---|---|
+| `ESC ] 52 ; c ; <b64> BEL` | passes through, width 20 | dropped, width 8 |
+| `ESC ] 2 ; … BEL` | passes through | dropped |
+| `ESC P … ESC \` (DCS) | passes through | dropped |
+| `ESC [ 10;10 H` | dropped | dropped |
+
+So on the version charm now ships, the clipboard write was already unreachable
+through `render!` before this change. It was **not** unreachable through
+`set-window-title` (S4), and it stays reachable for anyone pinning an older
+JLine.
+
+What 4.4.5 still lets through, which is what the sanitizer is actually buying:
+
+| injected | 4.4.5 `fromAnsi` result |
+|---|---|
+| `ESC c` (RIS) | **passes through — resets the terminal** |
+| `CR` | passes through; `visible ESC[2K CR hidden` measures 12 for 6 cells |
+| `BEL`, backspace | pass through |
+| `ESC [ ?1049h` (private CSI) | **mangled into the visible text `1049h`**, width 5 |
+| C1 `0x80`-`0x9f` | pass through |
+
+The first is a live terminal-reset vector, the second and fourth are content
+hiding plus a wrong width for everything downstream.
+
+### S2 — `strip-ansi` doesn't strip — **done**
 
 `src/charm/ansi/width.clj:13`. It is the function anyone displaying untrusted
 data will reach for, and it leaves everything in S1 intact. It also *mangles*
@@ -211,7 +255,10 @@ text `1049h`.
 
 **Suggestion:** make it exhaustive as part of S1.
 
-### S3 — Width measurement is wrong for unrecognised escapes
+**Resolved:** it is `sanitize/strip`. The `ESC [ ?1049h` → `1049h` mangling was
+still there on 4.4.5, so this half of S2 was real as written.
+
+### S3 — Width measurement is wrong for unrecognised escapes — **done**
 
 `"file" ESC "]2;PWNED" BEL ".txt"` measures **14** but displays **8**. Every
 downstream decision — truncate, pad, border, join, overlay — is then computed
@@ -219,7 +266,15 @@ from a wrong number, so injected content also breaks the frame.
 
 **Suggestion:** falls out of S1 once sanitisation happens before measurement.
 
-### S4 — `set-window-title` doesn't escape its argument
+**Resolved, but not by itself** — sanitising in `render!` is too late, because
+every layout decision is made above it. `string-width` and `truncate` sanitize
+their argument first instead.
+
+The example in the heading no longer reproduces on 4.4.5 (`fromAnsi` measures
+that OSC as 8), but `visible ESC[2K CR hidden` still measured 12 for 6 cells and
+`ESC[?1049h` still measured 5 for 0, so the class of bug was intact.
+
+### S4 — `set-window-title` doesn't escape its argument — **done**
 
 `src/charm/render/screen.clj:52`. A BEL or ESC in the title terminates the OSC
 early and lets the caller's string open a new one. Verified: title
@@ -231,7 +286,13 @@ terminals cap OSC 52 payloads and truncate silently.
 **Suggestion:** strip control characters from the title; document and enforce a
 size cap on the clipboard payload.
 
-### S5 — Signal handlers are registered and never restored
+**Resolved:** the title goes through `sanitize/strip-controls`, so it cannot end
+charm's OSC or open one of its own. This was the one place where the OSC 52
+clipboard write stayed reachable on 4.4.5, since it does not go through
+`fromAnsi`. `copy-to-clipboard` throws an `ex-info` naming the size above
+`max-clipboard-bytes` (74994, tmux's limit and the smallest of the common ones).
+
+### S5 — Signal handlers are registered and never restored — **done**
 
 `src/charm/program.clj:228,233`. `run`'s `finally` restores terminal attributes
 but not the WINCH/INT handlers. `Signals/register` returns the previous handler;
@@ -244,7 +305,18 @@ silently swallowed for the rest of the session.
 **Suggestion:** capture the return value of `Signals/register` and restore it in
 the `finally`.
 
-### S6 — No shutdown hook
+**Resolved, but not via J6** — see J6 for why `Terminal.handle` could not be
+used. `charm.terminal/handle-signal` and `restore-signal!` wrap
+`Signals/register` / `Signals/unregister`, `run` keeps what it displaced and puts
+it back in the `finally`, before the terminal closes under it.
+
+Verified against a real program: install a marker handler, displace it once to
+learn the native handler object JLine wrapped it in, run a program to completion,
+and check that object is the one installed afterwards. Note that
+`Signals/register` returns JLine's *native* handler, not the `Runnable` handed
+to it, so comparing against the `Runnable` reports a false failure.
+
+### S6 — No shutdown hook — **done**
 
 `finally` covers exceptions but not `System/exit` or SIGTERM. The terminal is
 left in raw mode, cursor hidden, alt-screen active.
@@ -254,7 +326,19 @@ running program, so this is reachable from the repo's own code.
 **Suggestion:** register a shutdown hook that restores attributes, shows the
 cursor and exits the alt screen.
 
-### S7 — CI supply chain
+**Resolved:** `run` registers one and removes it again in the `finally`, so
+repeated runs do not accumulate hooks. Both it and the `finally` call the same
+`restore-terminal!`, which tolerates running twice and after the terminal is
+gone. Verified by reproducing the `System/exit` path from
+`examples/timer.clj:198`: the restore sequences are emitted and the exit code
+survives.
+
+`restore-terminal!` is also two lines shorter than the cleanup it replaced:
+`render/stop!` already disables the mouse, focus reporting, shows the cursor and
+leaves the alternate screen, so the `finally`'s own `disable-mouse!` and
+`disable-focus-reporting!` were emitting every sequence twice.
+
+### S7 — CI supply chain — **mostly done**
 
 `.github/workflows/ci.yml`:
 
@@ -270,8 +354,15 @@ cursor and exits the alt screen.
 **Suggestion:** pin actions by SHA, pin the babashka installer to a tag, and fix
 the `$`. Consider gating release on a tag rather than every push to `main`.
 
-**Partly resolved:** the `$` is fixed. Pinning and the release gate are still
-open (Phase 2).
+**Resolved, except the release gate.** The `$` was fixed in Phase 1. All six
+actions are now pinned by commit SHA with the tag in a trailing comment, and the
+babashka installer is fetched from the `v1.13.223` tag rather than from `master`.
+The dev build that installer then downloads is still a moving target, which is
+unavoidable while charm needs JLine 4.4.5 and babashka carries it only there.
+
+**Still open:** the `release` job holds `CLOJARS_PASSWORD` with `contents: write`
+and fires on every push to `main`. Gating it on a tag changes how releases are
+cut, so it is the maintainer's call rather than a mechanical fix.
 
 ---
 
@@ -643,7 +734,7 @@ degradation).
 **Suggestion:** optional `charm.components.image` guarded by
 `isGraphicsSupported`; document the platform matrix.
 
-### J6 — Signal handling: migrate to `Terminal.handle`
+### J6 — Signal handling: migrate to `Terminal.handle` — **blocked**
 
 JLine 4 modernized signals (4.1 FFM `sigaction`, 4.2 ISIG restoration, 4.3
 PosixSysTerminal interception). charm uses the static
@@ -653,11 +744,30 @@ the previous handler** — exactly what S5 needs to restore Ctrl+C after exit.
 
 **Suggestion:** fix S5 by migrating to `Terminal.handle`, one change for both.
 
+**Not done — blocked on babashka.** The migration was written and reverted:
+`Terminal.handle` needs the nested `Terminal$Signal` and
+`Terminal$SignalHandler` classes, and babashka cannot resolve either
+(`Unable to resolve classname: org.jline.terminal.Terminal$Signal`), so the whole
+library failed to load under `bb test:bb` — a platform this project supports and
+tests in CI.
+
+S5 was fixed with the static `Signals` helper instead, which also returns the
+previous handler, so nothing was lost but the supported-API argument. Revisit if
+babashka exposes those classes.
+
 ### J7 — Behavior changes to be aware of
 
 - **Terminals throw when used after close** (4.0 breaking change; 3.x was
   silent). `run`'s cleanup ordering is fine, but `run-async`'s `:quit!` racing
   a late `render!` against `term/close` would now throw. Audit alongside S5/S6.
+
+  **Audited.** `run-async`'s `:quit!` only flips the `running?` atom; the loop
+  notices, finishes its iteration and then does its own cleanup, all on the
+  program's thread, so there is no external `render!` to race. The real exposure
+  was the WINCH handler, which outlived the program and called `get-size` on a
+  closed terminal — that is S5, now fixed. What remains is the input thread,
+  which can touch the reader after `term/close`; it catches `Exception` broadly
+  and is a daemon, so it exits quietly. P8 (backoff) is where that gets tidied.
 - 4.1.2/4.1.3 fixed alt-screen cursor positioning and raw-mode ISIG behavior —
   any local workarounds can be removed.
 - New sibling modules `jline-prompt` / `jline-components` / `jline-shell` (4.0):
@@ -686,9 +796,20 @@ three auto-boxing `recur` args. 163 tests / 1105 assertions passing, up from
 163 / 1001. Left for later, found while here: `key-match?` ignores modifiers
 outside its `"ctrl+x"` branch (now U12).
 
-**Phase 2 — security**
-S1 + S2 + S3 together (one sanitiser), then S4, S5 via J6, S6. Pin CI actions
-(S7). Audit the close-race from J7.
+**Phase 2 — security** — **done**
+S1 + S2 + S3 as one sanitiser (`charm.ansi.sanitize`), then S4, S5, S6, and the
+action pinning in S7. The J7 close-race audit landed on S5. 169 tests / 1159
+assertions passing, up from 163 / 1105.
+
+Two things did not go as planned. S5 could not be done via J6: `Terminal.handle`
+needs nested classes babashka cannot resolve, so it uses the `Signals` helper,
+which returns the previous handler just the same. And the JLine 4.4.5 bump from
+Phase 0 had already closed the OSC/DCS half of S1 — the sanitizer's remaining
+value is `ESC c`, CR, private CSI and C1, which are still live. Both are written
+up under their items.
+
+**Still open from this phase:** gating the release job on a tag instead of every
+push to `main` (S7), which changes how releases are cut.
 
 **Phase 3 — event loop**
 P1 + P2 as one change, then P6, P8. U5 and U6 land naturally on top.

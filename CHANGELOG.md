@@ -10,11 +10,21 @@ Versions are `MAJOR.MINOR.<commit count>` — the last number comes from
 ## Unreleased (0.3)
 
 Light/dark adaptive styling, colors written as plain values now actually apply,
-and a round of correctness fixes to documented features that silently did
-nothing.
+a round of correctness fixes to documented features that silently did nothing,
+and content a program did not author no longer reaches the terminal as
+instructions.
 
 ### Added
 
+- **`charm.ansi.sanitize`.** `sanitize` keeps SGR styling and drops every other
+  escape sequence, plus every control character but newline and tab; `strip`
+  drops the styling too, leaving the text a terminal would display;
+  `strip-controls` removes control characters entirely, for strings that go
+  inside a sequence charm writes itself. All three return their argument
+  unchanged when there is nothing to remove.
+- **`:sanitize` option on `run`** (default `true`), which sanitizes the view
+  before it is written. Set it to `false` only for a view that authors its own
+  control sequences.
 - **Adaptive colors.** `adaptive` takes a light and a dark variant and resolves
   against the terminal background at render time:
 
@@ -37,6 +47,17 @@ nothing.
 
 ### Changed
 
+- **`strip-ansi` strips.** It returned `AttributedString/fromAnsi`'s rendering,
+  which leaves a private `CSI` visible as text - `ESC[?1049h` came out as
+  `1049h` - and keeps carriage returns, BEL and backspace. It is now
+  `charm.ansi.sanitize/strip`.
+- **Width measurement sanitizes first.** `string-width` and `truncate` measure
+  what the terminal will be given, so a sequence JLine's SGR parser mangles
+  rather than removes no longer throws off truncation, padding, borders, joins
+  and overlays.
+- **`copy-to-clipboard` throws** an `ex-info` naming the size when the encoded
+  payload exceeds `max-clipboard-bytes` (74994, tmux's limit and the smallest
+  of the common ones), instead of letting the terminal truncate it silently.
 - **`key-match?` accepts the short spellings** `"esc"`, `"pgup"` and `"pgdown"`
   (as keywords too) for `:escape`, `:page-up` and `:page-down`. The default
   page bindings in `list`, `table`, `viewport` and `paginator` now read
@@ -67,6 +88,48 @@ nothing.
   visible without any charm code change: output to 8- and 16-color terminals is
   now downgraded as it is written, so on `TERM=xterm` a bright red `ESC[91m`
   reaches the terminal as `ESC[31m`. 256-color terminals are unaffected.
+
+### Security
+
+- **Content a program did not author no longer reaches the terminal as
+  instructions.** The view is sanitized before it is written, so an escape
+  sequence in a filename or a log line is removed rather than obeyed. What
+  JLine 4.4.5 did not already stop, and this does:
+
+  | injected into displayed text | before |
+  |---|---|
+  | `ESC c` | **resets the terminal** |
+  | `CR` | content overwrites the line it just drew, and measures wider than it displays |
+  | `ESC [ ?1049h` and other private CSI | rendered as the visible text `1049h`, corrupting the frame |
+  | C1 controls (`0x80`-`0x9f`) | passed through |
+
+  Note for anyone reading the 0.2 threat model: on JLine 4.3.1 this list also
+  included OSC 52 (**writes attacker data into the system clipboard**), OSC 2
+  (rewrites the window title), OSC 8 (hyperlinks the text elsewhere) and DCS.
+  `AttributedString/fromAnsi` drops all of those as of 4.4.5, so on this release
+  they were already unreachable through the render path before the sanitizer -
+  but not through `set-window-title`, and not for anyone pinning an older JLine.
+
+- **`set-window-title` escapes its argument.** Control characters are removed,
+  so a BEL or an ESC in the title can no longer end charm's OSC early and let
+  the rest of the string open one of its own - which was a clipboard write
+  reachable from any application that puts untrusted text in its title.
+
+- **Signal handlers are restored on exit.** `run` captured neither the `WINCH`
+  nor the `INT` handler it displaced. Both stayed installed after the program
+  returned, feeding a closed channel and a closed terminal - so in a REPL, which
+  outlives the program, Ctrl+C was swallowed for the rest of the session and a
+  window resize reached a terminal that was already gone.
+
+- **A shutdown hook restores the terminal.** `finally` does not cover
+  `System/exit` or `SIGTERM`, and an example in this repository exits from inside
+  a running program, which left raw mode on, the cursor hidden and the alternate
+  screen active.
+
+- **CI supply chain.** Actions are pinned by commit SHA rather than by tag, and
+  the babashka installer is fetched from a release tag rather than from `master`.
+  (The dev build it installs is still a moving target: charm needs JLine 4.4.5,
+  which babashka has only there.)
 
 ### Fixed
 
