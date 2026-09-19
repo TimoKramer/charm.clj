@@ -31,7 +31,13 @@
   (testing "creates style with options"
     (let [st (s/style :fg c/red :bold true)]
       (is (= c/red (:fg st)))
-      (is (true? (:bold st))))))
+      (is (true? (:bold st)))))
+
+  (testing "normalizes a bare padding or margin value"
+    (is (= [3] (:padding (s/style :padding 3))))
+    (is (= [3] (:margin (s/style :margin 3))))
+    (is (= [1 2] (:padding (s/style :padding [1 2]))))
+    (is (nil? (:padding (s/style))))))
 
 (deftest style-modifiers-test
   (testing "with-fg sets foreground"
@@ -67,9 +73,21 @@
     (let [result (s/render (s/style :bold true) "hello")]
       (is (str/includes? result "\u001b[1m"))))
 
+  (testing "renders every documented text attribute"
+    (doseq [[attr code] {:bold "1" :faint "2" :italic "3" :underline "4"
+                         :blink "5" :reverse "7" :strikethrough "9"}]
+      (is (str/includes? (s/render (s/style attr true) "hello")
+                         (str "\u001b[" code "m"))
+          (str attr " should emit SGR " code))))
+
   (testing "renders with padding"
     (let [result (s/render (s/style :padding [0 2 0 2]) "hi")]
       (is (str/includes? result "  hi  "))))
+
+  (testing "renders with a bare padding value"
+    (let [lines (str/split-lines (s/render (s/style :padding 1) "hi"))]
+      (is (= 3 (count lines)))
+      (is (str/includes? (second lines) " hi "))))
 
   (testing "renders with border"
     (let [result (s/render (s/style :border b/normal) "hi")
@@ -110,6 +128,9 @@
     (let [[w h] (s/frame-size (s/style :padding [1 2]))]
       (is (= 4 w))   ; 2 left + 2 right
       (is (= 2 h)))) ; 1 top + 1 bottom
+
+  (testing "calculates frame size with a bare padding value"
+    (is (= [6 6] (s/frame-size (s/style :padding 3)))))
 
   (testing "calculates frame size with margin"
     (let [[w h] (s/frame-size (s/style :margin [1]))]

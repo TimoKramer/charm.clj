@@ -33,6 +33,7 @@
      :blink      - Blinking text
      :faint      - Faint/dim text
      :reverse    - Reverse video
+     :strikethrough - Strikethrough text
 
      ;; Dimensions
      :width      - Fixed width (pads/truncates)
@@ -42,9 +43,9 @@
      :align      - Horizontal alignment (:left :center :right)
      :valign     - Vertical alignment (:top :center :bottom)
 
-     ;; Spacing
-     :padding    - Padding [top right bottom left] or single value
-     :margin     - Margin [top right bottom left] or single value
+     ;; Spacing (1-4 values in CSS order, or a bare number for all sides)
+     :padding    - Padding [top right bottom left]
+     :margin     - Margin [top right bottom left]
 
      ;; Border
      :border     - Border style (from charm.style.border)
@@ -54,26 +55,29 @@
      ;; Rendering
      :inline     - Remove newlines when true"
   [& {:as opts}]
-  (merge
-   {:fg nil
-    :bg nil
-    :bold false
-    :italic false
-    :underline false
-    :blink false
-    :faint false
-    :reverse false
-    :width nil
-    :height nil
-    :align :left
-    :valign :top
-    :padding nil
-    :margin nil
-    :border nil
-    :border-fg nil
-    :border-bg nil
-    :inline false}
-   opts))
+  (cond-> (merge
+           {:fg nil
+            :bg nil
+            :bold false
+            :italic false
+            :underline false
+            :blink false
+            :faint false
+            :reverse false
+            :strikethrough false
+            :width nil
+            :height nil
+            :align :left
+            :valign :top
+            :padding nil
+            :margin nil
+            :border nil
+            :border-fg nil
+            :border-bg nil
+            :inline false}
+           opts)
+    (:padding opts) (update :padding l/normalize-box)
+    (:margin opts)  (update :margin l/normalize-box)))
 
 ;; ---------------------------------------------------------------------------
 ;; Style Modifiers
@@ -104,12 +108,12 @@
 (defn with-padding
   "Set padding. Accepts [t r b l] or single value."
   [s padding]
-  (assoc s :padding (if (number? padding) [padding] (vec padding))))
+  (assoc s :padding (l/normalize-box padding)))
 
 (defn with-margin
   "Set margin. Accepts [t r b l] or single value."
   [s margin]
-  (assoc s :margin (if (number? margin) [margin] (vec margin))))
+  (assoc s :margin (l/normalize-box margin)))
 
 (defn with-border
   "Set border style."
@@ -145,16 +149,17 @@
 
    Useful for direct AttributedString construction:
      (AttributedString. text (style->attributed-style my-style))"
-  ^AttributedStyle [{:keys [fg bg bold italic underline blink faint reverse]}]
+  ^AttributedStyle [{:keys [fg bg bold italic underline blink faint reverse strikethrough]}]
   (cond-> AttributedStyle/DEFAULT
-    bold      (.bold)
-    faint     (.faint)
-    italic    (.italic)
-    underline (.underline)
-    blink     (.blink)
-    reverse   (.inverse)
-    fg        (c/apply-color-fg fg)
-    bg        (c/apply-color-bg bg)))
+    bold          (.bold)
+    faint         (.faint)
+    italic        (.italic)
+    underline     (.underline)
+    blink         (.blink)
+    reverse       (.inverse)
+    strikethrough (.crossedOut)
+    fg            (c/apply-color-fg fg)
+    bg            (c/apply-color-bg bg)))
 
 (defn attributed-string
   "Create a JLine AttributedString with the given style applied.

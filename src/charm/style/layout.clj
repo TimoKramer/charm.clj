@@ -18,6 +18,13 @@
 ;; Box Value Expansion (CSS-style)
 ;; ---------------------------------------------------------------------------
 
+(defn normalize-box
+  "Normalize a box spec to a vector of 1-4 values.
+
+   Accepts a bare number (applies to all sides) or a sequence of 1-4 values."
+  [values]
+  (if (number? values) [values] (vec values)))
+
 (defn expand-box-values
   "Expand 1-4 values to [top right bottom left] (CSS box model).
 
