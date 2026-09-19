@@ -744,16 +744,44 @@ the previous handler** — exactly what S5 needs to restore Ctrl+C after exit.
 
 **Suggestion:** fix S5 by migrating to `Terminal.handle`, one change for both.
 
-**Not done — blocked on babashka.** The migration was written and reverted:
-`Terminal.handle` needs the nested `Terminal$Signal` and
-`Terminal$SignalHandler` classes, and babashka cannot resolve either
-(`Unable to resolve classname: org.jline.terminal.Terminal$Signal`), so the whole
-library failed to load under `bb test:bb` — a platform this project supports and
-tests in CI.
+**Not done — blocked on babashka, and the blocker is `reify`, not the class.**
+The migration was written and reverted: it fails to load under `bb test:bb`, a
+platform this project supports and tests in CI. Diagnosed precisely afterwards,
+because the first read of the error was misleading:
 
-S5 was fixed with the static `Signals` helper instead, which also returns the
-previous handler, so nothing was lost but the supported-API argument. Revisit if
-babashka exposes those classes.
+| in babashka | result |
+|---|---|
+| `Class/forName` on `Terminal$Signal`, `Terminal$SignalHandler`, `Terminal$MouseTracking`, `MouseEvent` | all resolve — the classes are in the image |
+| `Terminal$Signal` as a *symbol* (`:import`, static field access) | not exposed to SCI |
+| `Terminal$SignalHandler` as a symbol | **exposed** |
+| `(.getEnumConstants Terminal$Signal)` via `Class/forName` | works — enum values are reachable |
+| `(.getField signal-class "WINCH")` | fails, not registered for reflection |
+| `reify Terminal$SignalHandler` | **`Unsupported interface in reify`** |
+| `java.lang.reflect.Proxy` | not exposed |
+
+So the handler interface cannot be implemented in babashka at all: `reify` works
+only for the interfaces on babashka's own list (`Runnable`, `Comparator`,
+`Map$Entry` and the like), and there is no `Proxy` to fall back on. Exposing
+`Terminal$Signal` would not be enough; babashka would have to add a third-party
+callback interface to its reify registry, which is a larger ask than exposing a
+class, and would then put a floor on the babashka version charm supports.
+
+S5 was fixed with the static `Signals` helper instead — it returns the previous
+handler just as `Terminal.handle` does, and `reify Runnable` is on babashka's
+list. Nothing was lost but the supported-API argument.
+
+Worth revisiting when there is a reason beyond tidiness. The candidates:
+`Signals` installs handlers process-globally where `Terminal.handle` is
+per-terminal (latent, since the handlers are now restored); JLine's newer signal
+work — 4.1's FFM `sigaction`, 4.2's ISIG restoration, 4.3's `PosixSysTerminal`
+interception — lands on `Terminal.handle` and not on `Signals`, and charm runs in
+raw mode, where ISIG behavior matters; and `Signals` reflects on
+`sun.misc.Signal`, which needs GraalVM reflection config (untested against the
+native-image config under `doc/examples/`).
+
+**Note for J4:** `trackMouse` takes the `Terminal$MouseTracking` *enum*, not a
+callback, and `.getEnumConstants` does work in babashka — so J4 does not need
+anything from babashka, unlike this.
 
 ### J7 — Behavior changes to be aware of
 
