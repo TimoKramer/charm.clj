@@ -183,40 +183,48 @@ Sequencing — each step is independently shippable:
 5. Retire the dynamic vars; switch emission to `toAnsi(Terminal)` and update the
    true-color assertions in `test/charm/style/color_test.clj`.
 
-**Step 5 must keep the 16-color path.** `toAnsi(Terminal)` rounds into the
-terminal's `ColorPalette`, and `ColorPalette`'s constructor reads
-`Arrays.copyOf(DEFAULT_COLORS_256, min(max_colors, 256))` — but measured on a
-real pty (`FfmUnixSysTerminal`), the as-built palette is 256 entries at *every*
-terminal type:
+**Step 5 can delete `downgrade-color` outright, from JLine 4.4.5 on.**
+`toAnsi(Terminal)` rounds into the terminal's `ColorPalette`, which is now sized
+from `max_colors`, so passing a terminal gets profile detection *and* the
+downgrade — including to 8 and 16 colors, emitted as basic SGR:
 
 ```
-TERM=xterm           max=8    len=256  toAnsi="\e[38;5;208m"
-TERM=xterm-16color   max=16   len=256  toAnsi="\e[38;5;208m"
+TERM=xterm           max=8    len=8    toAnsi="\e[31m"
+TERM=xterm-16color   max=16   len=16   toAnsi="\e[91m"
 TERM=xterm-256color  max=256  len=256  toAnsi="\e[38;5;208m"
 ```
 
-`AbstractTerminal` builds the palette in its own constructor, before the
-capability database is available, so `getNumericCapability(max_colors)` returns
-null there and the fallback takes the full table. The capability reads correctly
-afterwards — too late. So a `TERM=xterm` terminal gets a 256-color escape from
-JLine, and charm's `:ansi` branch is load-bearing. What step 5 *can* delegate is
-`:ansi256` (JLine's 256-rounding is the better matcher) and true color.
+This needed two fixes upstream, both filed from this work and released in
+**4.4.5**:
 
-**Do not call `ColorPalette.loadPalette()`.** It is the OSC 4 query for the
-terminal's real palette, and it validates nothing it gets back. On the same pty
-it returned a one-entry palette, marked it `isReal`, and collapsed every color
-to black:
+- [#2256](https://github.com/jline/jline3/issues/2256) — the palette was built in
+  `AbstractTerminal`'s constructor, before `parseInfoCmp()` had populated the
+  capabilities, so `max_colors` read back `null` and every terminal got the full
+  256-entry table. Fixed by
+  [#2260](https://github.com/jline/jline3/pull/2260), which adds
+  `ColorPalette.reloadFromCapabilities()` and calls it from `parseInfoCmp()` and
+  `setEnv()`.
+- [#2257](https://github.com/jline/jline3/issues/2257) — `loadPalette()` accepted
+  a one-entry all-black palette from a terminal that never answered OSC 4. Fixed
+  by [#2261](https://github.com/jline/jline3/pull/2261), which returns an empty
+  array when nothing was read and catches `ClosedException`.
 
-```
-LOADED  len=1  real?=true  round=0  toAnsi="\e[30m"
-```
+`ColorPalette.loadPalette()` is therefore safe to call from 4.4.5 on — a silent
+terminal now falls back to the default table and returns `false`. It stays
+optional: its value is rounding against the user's actual theme rather than a
+default table.
 
-That is not a pty artifact. `doLoad` validates each RGB component's format but
-never the length of what it assembled, and it trims trailing zero entries — so a
-terminal that does not answer leaves an all-zero array, which trims to one entry
-and is accepted as `isReal`. Any terminal that ignores OSC 4 gets this. If
-rounding against the user's actual theme is ever wanted, validate the length
-before accepting the result.
+**This makes JLine ≥ 4.4.5 a hard floor** for step 5, which matters because
+consumers can override the version. Before 4.4.5 the palette is always 256
+entries, `toAnsi(Terminal)` emits a 256-color escape to a `TERM=xterm` terminal,
+and charm's own `:ansi` branch is the only thing doing that downgrade.
+
+Note that `charm.render.core` already renders through JLine's `Display`, which
+holds `terminal.getPalette()` and emits via `toAnsiBytes(…, ColorPalette, …)`.
+So from 4.4.5 the write-time rounding is live on the current code, before any of
+this ADR is implemented: on an 8-color terminal charm's `\e[91m` now reaches the
+terminal as `\e[31m`. That is a second reason the two downgrades should collapse
+into one.
 
 Step 5 is where PLAN.md's premise 1 gets resolved. Until then the dynamic vars
 stay as the interim mechanism, as recorded in J1.
