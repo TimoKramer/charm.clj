@@ -9,8 +9,9 @@ Versions are `MAJOR.MINOR.<commit count>` — the last number comes from
 
 ## Unreleased (0.3)
 
-Light/dark adaptive styling, and colors written as plain values now actually
-apply.
+Light/dark adaptive styling, colors written as plain values now actually apply,
+and a round of correctness fixes to documented features that silently did
+nothing.
 
 ### Added
 
@@ -36,6 +37,14 @@ apply.
 
 ### Changed
 
+- **`key-match?` accepts the short spellings** `"esc"`, `"pgup"` and `"pgdown"`
+  (as keywords too) for `:escape`, `:page-up` and `:page-down`. The default
+  page bindings in `list`, `table`, `viewport` and `paginator` now read
+  `"page-up"` / `"page-down"`.
+- **The event loop skips the render when `update` returns the state
+  unchanged**, instead of re-running `view` and diffing the frame for a message
+  the application ignored. A resize still repaints, since the frame changed even
+  when the state did not.
 - **Colors written as plain values now apply.** `:fg 240` (ANSI 256 code),
   `:fg :red` (ANSI 16 name) and `:fg "#ff8000"` (hex string) were silently
   dropped before. This also disabled the library's own default styling in
@@ -61,6 +70,24 @@ apply.
 
 ### Fixed
 
+- **`"esc"`, `"pgup"` and `"pgdown"` never matched anything.** Key events carry
+  `:escape`, `:page-up` and `:page-down`, so `key-match?` compared against
+  `"escape"` and friends. Page Up and Page Down were dead in `list`, `table`,
+  `viewport` and `paginator`, and every `"esc"` binding — including the ones in
+  this repository's own examples and guides — silently did nothing.
+- **`:strikethrough` is applied.** It was documented and used, but never reached
+  `AttributedStyle`.
+- **`(style :padding 3)` no longer throws.** A bare number is normalized to a
+  box vector, as `with-padding` already did, so both entry points agree.
+- **A viewport or an overflowing view no longer copies all of its content each
+  frame.** Both paths called `(vec lines)` on what was already a vector before
+  taking a `subvec`, making a viewport over a large log O(total lines) per frame
+  instead of O(visible).
+- **Reflective calls on render paths.** Type hints in `charm.style.overlay`
+  (per overlay line), `charm.render.core` and `charm.input.keymap`; padding is
+  built with `String.repeat` rather than a seq of characters. A new
+  `clojure -M:reflection` check fails the build on any reflection or
+  auto-boxing warning under `src/`.
 - **The 16-color downgrade produced arbitrary colors.** It took `(mod code 16)`
   of a 256-color cube index, which is colorimetrically meaningless — orange came
   out cyan. It was unreachable until profile downgrading was wired into the

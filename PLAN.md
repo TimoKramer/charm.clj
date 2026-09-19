@@ -24,9 +24,10 @@ location, and a concrete suggestion.
 3. **Rewrite the event loop** to block on the channel, drain, and render once per
    frame — fixes the 100 msg/s ceiling and makes `:fps` real in a single change.
    (P1, P2, P3)
-4. **Fix `:fg 240`, `:strikethrough` and `"pgup"`** — three small bugs that make
-   documented features, the library's own default styling, and Page Up/Down
-   silently do nothing. (U1 — **done**; U2, U3 outstanding)
+4. ~~**Fix `:fg 240`, `:strikethrough` and `"pgup"`**~~ — **done** (U1, U2, U3).
+   Three small bugs that made documented features, the library's own default
+   styling, and Page Up/Down silently do nothing. U3 turned out to cover `"esc"`
+   as well, which was dead in every example in the repository.
 
 ---
 
@@ -60,12 +61,17 @@ coalescing: every single message triggers a full `view` + `render!`.
 → render once per frame tick. One change fixes both the input ceiling and the
 render amplification.
 
-### P3 — No skip-render on unchanged state
+### P3 — No skip-render on unchanged state — **done**
 
 `src/charm/program.clj:263-268`. A message that leaves state identical still
 re-runs `view` and `Display.update`.
 
 **Suggestion:** `(when-not (identical? new-state old-state) (render! ...))`.
+
+**Resolved:** the two copies of update-then-render in the event loop collapsed
+into `handle-msg!`, which renders only when `update` returned a state that is
+not `identical?` to the old one. A resize passes `:force-render? true`, since
+the frame changed even when the application ignored the message.
 
 ### P4 — Every line is ANSI-parsed twice per frame
 
@@ -120,7 +126,7 @@ concurrent sleeping or IO-bound commands starves the pool and freezes the UI.
 
 **Suggestion:** use `a/thread` for `:cmd` and `:sequence` bodies.
 
-### P7 — Full-vector copies per frame
+### P7 — Full-vector copies per frame — **done**
 
 `src/charm/components/viewport.clj:255` and `src/charm/render/core.clj:187` both
 do `(subvec (vec lines) …)`. `lines` is already a vector from `str/split-lines`,
@@ -128,6 +134,9 @@ so `(vec …)` copies the entire content on every render. A viewport over a larg
 log is O(total lines) per frame instead of O(visible).
 
 **Suggestion:** drop the `(vec …)`.
+
+**Resolved:** dropped in both places. `:lines` comes from `split-content` and
+the renderer's from `content->lines`; both are already vectors.
 
 ### P8 — Input thread can busy-spin
 
@@ -138,7 +147,7 @@ at 100%.
 **Suggestion:** count consecutive failures, back off, and bail out after a
 threshold.
 
-### P9 — Reflection on hot paths
+### P9 — Reflection on hot paths — **done**
 
 - `src/charm/style/overlay.clj:48,51,57` — per line, per overlay
 - `src/charm/input/keymap.clj:134`
@@ -149,6 +158,20 @@ called per line per frame throughout layout.
 
 **Suggestion:** add type hints; enable `*warn-on-reflection*` in the test alias so
 regressions get caught.
+
+**Resolved:** all five sites hinted — `.append` takes `^CharSequence`,
+`KeyMap.bind` resolves to the `(Object, CharSequence)` overload, and the
+`ArrayList` constructor to `(Collection)`. `w/repeat-char` builds padding with
+`String.repeat` and is used by `pad-right`, `pad-left` and the overlay.
+
+The regression guard is a `:reflection` alias rather than the test alias:
+Clojure honours `*warn-on-reflection*` only while compiling, and neither
+`clojure -M` nor the test runner binds it, so `dev/reflection.clj` loads every
+namespace under `src/` with the flag on and exits non-zero if anything warned.
+It is wired into `bb ci` and the workflow. Since it captures `*err*` wholesale
+it also catches auto-boxing warnings, which turned up three `recur` args in
+`charm.ansi.parser`, `charm.style.border` and `charm.components.help`; those are
+coerced with `long`.
 
 ---
 
@@ -247,6 +270,9 @@ cursor and exits the alt screen.
 **Suggestion:** pin actions by SHA, pin the babashka installer to a tag, and fix
 the `$`. Consider gating release on a tag rather than every push to `main`.
 
+**Partly resolved:** the `$` is fixed. Pinning and the release gate are still
+open (Phase 2).
+
 ---
 
 ## 3. Usability
@@ -272,7 +298,7 @@ offending value otherwise. Coercion happens in `apply-color-fg` / `apply-color-b
 rather than in each constructor, so every entry point — `style`, `with-fg`,
 `with-bg`, `styled-str` — picks it up at once.
 
-### U2 — `:strikethrough` silently does nothing
+### U2 — `:strikethrough` silently does nothing — **done**
 
 Documented in the `doc/api/styling.md:32` options table, used in
 `doc/examples/src/examples/todos.clj:20`, never applied by
@@ -281,7 +307,12 @@ Documented in the `doc/api/styling.md:32` options table, used in
 **Suggestion:** add it to the `cond->`, and audit the docs table against that
 function for anything else missing.
 
-### U3 — `"pgup"` / `"pgdown"` never match — Page Up/Down is dead in four components
+**Resolved:** added as `.crossedOut`, plus `:strikethrough false` in the `style`
+constructor's defaults. The audit found nothing else missing — the docs table
+and the `cond->` now agree, and a test walks every documented attribute and
+asserts its SGR code reaches the output.
+
+### U3 — `"pgup"` / `"pgdown"` never match — Page Up/Down is dead in four components — **done**
 
 Key events carry `:key :page-up`; `key-match?` compares against
 `(name :page-up)` = `"page-up"`. Verified:
@@ -297,7 +328,26 @@ aliases in `key-match?`. Add a test that asserts every default binding string in
 every component resolves against a real key event — this class of bug is
 otherwise invisible.
 
-### U4 — `(style :padding 3)` throws
+**Resolved:** both. The component defaults were renamed to `"page-up"` /
+`"page-down"`, and `key-match?` gained a small alias table, because the same bug
+covered **`"esc"`**, which is used in ten of this repository's own examples and
+guides plus the `doc/api/messages.md` table — so escape handling was dead
+throughout the sample code, not just Page Up and Page Down.
+
+The guard is `test/charm/components/keybindings_test.clj`. Rather than encode a
+naming convention, it generates one key-press message for every key a real event
+can carry (`keys/key-types` plus printable runes, across all eight modifier
+combinations) and asserts that each default binding in every component matches at
+least one of them — i.e. that some real keystroke can reach it.
+
+`key-match?` was also simplified while there: its keyword and string branches
+were the same comparison written twice, and the modifier branch's
+`(= key-part (str msg-key))` fallback was unreachable, since `:key` is always
+either a string or a keyword.
+
+One thing found here and deliberately left alone, now U12 below.
+
+### U4 — `(style :padding 3)` throws — **done**
 
 `render` passes the raw value to `expand-box-values` →
 `UnsupportedOperationException: count not supported on this type: Long`.
@@ -309,6 +359,23 @@ two entry points disagree.
 
 **Suggestion:** normalize in `style`, and wrap `hex` parse failures in `ex-info`
 with the offending string.
+
+**Resolved:** the normalization `with-padding` did inline moved to
+`layout/normalize-box`, which `style`, `with-padding` and `with-margin` all use,
+so the stored value is a vector whichever entry point built it. The `hex` half
+landed with U1.
+
+### U12 — `key-match?` ignores modifiers unless the pattern names one
+
+`(msg/key-match? (msg/key-press "c" :ctrl true) "c")` is `true`: only the
+`"ctrl+x"` branch looks at `:ctrl` / `:alt` / `:shift`, so a plain `"c"` binding
+also fires on Ctrl+C. Found while fixing U3 and left alone there, because it
+changes matching semantics for every existing binding rather than adding a
+missing name.
+
+**Suggestion:** require the message's modifiers to be unset when the pattern
+names none, and check the repo's own bindings for anything that was relying on
+the loose match.
 
 ### U5 — Bracketed paste is built but never wired up
 
@@ -612,8 +679,12 @@ and added the `:color-profile` / `:dark-background?` options so the detected
 environment can be pinned. 163 tests / 1001 assertions passing, up from
 152 / 940.
 
-**Phase 1 — correctness bugs, small and independent**
-U2, U3, U4, P3, P7, P9, and the `$` fix in S7.
+**Phase 1 — correctness bugs, small and independent** — **done**
+U2, U3, U4, P3, P7, P9, and the `$` fix in S7. U3 grew to cover `"esc"`, which
+was dead everywhere; P9 grew a `:reflection` build check, which also turned up
+three auto-boxing `recur` args. 163 tests / 1105 assertions passing, up from
+163 / 1001. Left for later, found while here: `key-match?` ignores modifiers
+outside its `"ctrl+x"` branch (now U12).
 
 **Phase 2 — security**
 S1 + S2 + S3 together (one sanitiser), then S4, S5 via J6, S6. Pin CI actions
@@ -630,4 +701,5 @@ and the Phase 0 dynamic vars are retired.
 
 **Phase 5 — JLine adoption + API ergonomics**
 J3 (ScreenTerminal tests — can also be pulled earlier, it's independent),
-J2 spike, J4, J5. U7, U8, U9, U10, U11.
+J2 spike, J4, J5. U7, U8, U9, U10, U11, U12 (U12 with U9, since both are about
+key matching).
