@@ -25,12 +25,25 @@
 
 (deftest window-title-test
   (testing "sets window title"
-    (is (= "\u001b]2;Hello\u0007" (scr/set-window-title "Hello")))))
+    (is (= "\u001b]2;Hello\u0007" (scr/set-window-title "Hello"))))
+
+  (testing "a title cannot end the OSC early and open another"
+    (let [seq-str (scr/set-window-title "hi\u001b]52;c;ZXZpbA==")]
+      ;; One OSC introducer and one terminator, both ours
+      (is (= 1 (count (re-seq #"\u001b\]" seq-str))))
+      (is (= 1 (count (re-seq #"\u0007" seq-str))))
+      (is (= "\u001b]2;hi]52;c;ZXZpbA==\u0007" seq-str)))))
 
 (deftest clipboard-test
   (testing "copies to clipboard using OSC 52"
     ;; "Hello" in base64 is "SGVsbG8="
-    (is (= "\u001b]52;c;SGVsbG8=\u0007" (scr/copy-to-clipboard "Hello")))))
+    (is (= "\u001b]52;c;SGVsbG8=\u0007" (scr/copy-to-clipboard "Hello"))))
+
+  (testing "a payload over the terminals' cap throws instead of being truncated"
+    (let [too-big (apply str (repeat (inc scr/max-clipboard-bytes) "x"))
+          e (is (thrown? clojure.lang.ExceptionInfo (scr/copy-to-clipboard too-big)))]
+      (is (= scr/max-clipboard-bytes (:max-bytes (ex-data e))))
+      (is (> (:encoded-bytes (ex-data e)) scr/max-clipboard-bytes)))))
 
 (deftest content->lines-test
   (testing "splits on newlines"

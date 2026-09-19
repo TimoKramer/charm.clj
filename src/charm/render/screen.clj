@@ -3,8 +3,10 @@
 
    For cursor movement, screen clearing, and alt screen, use charm.terminal
    which uses JLine's capability-based approach for better terminal compatibility."
-  (:require [charm.ansi.width :as w]
-            [clojure.string :as str]))
+  (:require [charm.ansi.sanitize :as san]
+            [charm.ansi.width :as w]
+            [clojure.string :as str])
+  (:import [java.util Base64]))
 
 ;; ---------------------------------------------------------------------------
 ;; Constants
@@ -44,17 +46,39 @@
 ;; Window Title (OSC 2)
 ;; ---------------------------------------------------------------------------
 
-(defn set-window-title [title]
-  (str ESC "]2;" title "\u0007"))
+(defn set-window-title
+  "OSC 2 sequence setting the window title.
+
+   Control characters are removed from `title`: a BEL or an ESC in it would end
+   this OSC early and let the rest of the argument open one of its own."
+  [title]
+  (str ESC "]2;" (san/strip-controls title) "\u0007"))
 
 ;; ---------------------------------------------------------------------------
 ;; Clipboard (OSC 52)
 ;; ---------------------------------------------------------------------------
 
-(defn copy-to-clipboard [^String text]
-  (let [encoder (java.util.Base64/getEncoder)
-        bytes (.getBytes text "UTF-8")
-        encoded (.encodeToString encoder bytes)]
+(def ^:const max-clipboard-bytes
+  "Largest clipboard payload we will emit, in base64 characters.
+
+   Terminals cap OSC 52 and truncate what is over the cap silently, so a
+   too-large copy would otherwise leave the user with a corrupted clipboard and
+   no error. 74994 is tmux's limit, the smallest of the common ones."
+  74994)
+
+(defn copy-to-clipboard
+  "OSC 52 sequence copying `text` to the system clipboard.
+
+   Throws an ex-info naming the size if the encoded payload exceeds
+   `max-clipboard-bytes`, rather than letting the terminal truncate it."
+  [^String text]
+  (let [encoded (.encodeToString (Base64/getEncoder) (.getBytes text "UTF-8"))]
+    (when (> (count encoded) max-clipboard-bytes)
+      (throw (ex-info (str "Clipboard payload of " (count encoded)
+                           " bytes exceeds the " max-clipboard-bytes
+                           "-byte limit terminals impose on OSC 52")
+                      {:encoded-bytes (count encoded)
+                       :max-bytes max-clipboard-bytes})))
     (str ESC "]52;c;" encoded "\u0007")))
 
 ;; ---------------------------------------------------------------------------
