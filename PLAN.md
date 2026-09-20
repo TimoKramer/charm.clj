@@ -711,8 +711,10 @@ after. At an odd height it is still one short, because each list item is two row
 
 **What would justify real API**, and did not turn up here: a view whose chrome
 height depends on the body's height. That is circular, so no amount of measuring
-resolves it, and it is the case a layout container would exist for. Tracked as a
-GitHub issue rather than left here.
+resolves it, and it is the case a layout container would exist for. Written up as
+[issue #19](https://github.com/TimoKramer/charm.clj/issues/19), with the shape, the
+algorithm, the constraints that came out of ADR 008 and the sanitiser work, and the
+open design questions — so it does not have to be rediscovered.
 
 ---
 
@@ -1075,14 +1077,16 @@ Premise 1 under J1 (true color) and retiring the dynamic vars are unaffected by
 that rejection — both are about the renderer holding the terminal at emission
 time, not about the representation.
 
-**Phase 5 — JLine adoption + API ergonomics** — **ergonomics done**
+**Phase 5 — JLine adoption + API ergonomics** — **ergonomics and J3 done**
 U7, U8, U9, U10 and U12 landed together: `:overflow`, an id counter,
 `merge-style`, one key matcher instead of two, and a bare key name no longer
 matching a modified key. 180 tests / 1269 assertions passing, up from
 176 / 1229.
 
-Still open: U11 (auto-sizing, which is an API design question rather than a fix),
-and the JLine items — J3 (ScreenTerminal-based integration tests), the J2
-`KeyParser` spike, J4 (`trackMouse`), J5 (terminal graphics). J4's enum is not
-exposed to babashka's SCI, though `getEnumConstants` reaches it, so that one needs
-the same care as J6 did.
+U11 turned out to need no API at all, and J3 landed as a fourth test tier.
+
+Still open: the J2 `KeyParser` spike, J4 (`trackMouse`) and J5 (terminal graphics).
+J4's enum is not exposed to babashka's SCI, though `getEnumConstants` reaches it, so
+that one needs the same care as J6 did. A layout container, which is what U11 would
+have been if it were an API problem, is
+[issue #19](https://github.com/TimoKramer/charm.clj/issues/19).
