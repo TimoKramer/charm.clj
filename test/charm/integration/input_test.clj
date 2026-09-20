@@ -6,7 +6,9 @@
   (:require
    [clojure.test :refer [deftest is testing]]
    [charm.input.handler :as input]
-   [charm.input.mouse :as mouse])
+   [charm.input.keymap :as km]
+   [charm.input.mouse :as mouse]
+   [charm.program])
   (:import
    [java.io ByteArrayOutputStream PipedInputStream PipedOutputStream]
    [org.jline.terminal TerminalBuilder]))
@@ -355,3 +357,38 @@
   (testing "returns nil on empty input with timeout"
     (with-test-terminal [terminal ""]
       (is (nil? (input/read-event terminal :timeout-ms 10))))))
+
+;; ---------------------------------------------------------------------------
+;; Bracketed Paste
+;; ---------------------------------------------------------------------------
+
+(deftest read-paste-test
+  (let [read-paste #'charm.program/read-paste
+        collect (fn [input]
+                  (with-test-terminal [terminal input]
+                    (let [keymap (km/create-keymap terminal)]
+                      ;; The start marker is consumed by the caller, so the
+                      ;; input here begins with the pasted body
+                      (read-paste terminal keymap (atom true)))))]
+    (testing "everything up to the end marker is one string"
+      (is (= "hello world" (collect "hello world\u001b[201~"))))
+
+    (testing "tabs and newlines inside a paste are text, not key presses"
+      (is (= "a\tb\nc" (collect "a\tb\rc\u001b[201~"))))
+
+    (testing "an unterminated paste returns what arrived"
+      (is (= "partial" (collect "partial"))))
+
+    (testing "a key that cannot be part of the text does not end the paste"
+      ;; An arrow key mid-paste is dropped, and the rest still arrives
+      (is (= "ab" (collect "a\u001b[Ab\u001b[201~"))))
+
+    (testing "an empty paste is an empty string"
+      (is (= "" (collect "\u001b[201~"))))
+
+    (testing "it gives up when the program stops running"
+      (with-test-terminal [terminal "never-ends"]
+        (let [keymap (km/create-keymap terminal)
+              running? (atom true)]
+          (future (Thread/sleep 50) (reset! running? false))
+          (is (string? (read-paste terminal keymap running?))))))))

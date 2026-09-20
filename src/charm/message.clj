@@ -81,6 +81,15 @@
   []
   {:type :blur})
 
+(defn paste
+  "Create a paste message carrying the whole pasted text.
+
+   Sent instead of one key press per character when `run` was given
+   `:bracketed-paste true` and the terminal supports it."
+  [text]
+  {:type :paste
+   :text text})
+
 ;; ---------------------------------------------------------------------------
 ;; Type Predicates
 ;; ---------------------------------------------------------------------------
@@ -109,6 +118,11 @@
   "Check if message is an error."
   [msg]
   (= :error (:type msg)))
+
+(defn paste?
+  "Check if message is a paste."
+  [msg]
+  (= :paste (:type msg)))
 
 (defn mouse?
   "Check if message is a mouse event."

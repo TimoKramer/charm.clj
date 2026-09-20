@@ -22,10 +22,11 @@
      :alt-screen  - Use alternate screen buffer (default: false)
      :hide-cursor - Hide cursor during rendering (default: true)
      :sanitize    - Drop everything but SGR styling from rendered content
-                    (default: true)"
-  [^Terminal terminal & {:keys [fps alt-screen hide-cursor sanitize]
+                    (default: true)
+     :bracketed-paste - Ask the terminal to bracket pasted text (default: false)"
+  [^Terminal terminal & {:keys [fps alt-screen hide-cursor sanitize bracketed-paste]
                          :or {fps 60 alt-screen false hide-cursor true
-                              sanitize true}}]
+                              sanitize true bracketed-paste false}}]
   (let [{:keys [width height]} (term/get-size terminal)
         display (doto (Display. terminal false)
                   (.resize height width))]
@@ -36,6 +37,7 @@
            :in-alt-screen false
            :hide-cursor hide-cursor
            :sanitize sanitize
+           :bracketed-paste bracketed-paste
            :width width
            :height height
            :running false})))
@@ -239,17 +241,21 @@
 (defn start!
   "Start the renderer."
   [renderer]
-  (let [{:keys [alt-screen hide-cursor]} @renderer]
+  (let [{:keys [alt-screen hide-cursor bracketed-paste]} @renderer]
     (when hide-cursor
       (hide-cursor! renderer))
     (when alt-screen
       (enter-alt-screen! renderer))
+    (when bracketed-paste
+      (enable-bracketed-paste! renderer))
     (swap! renderer assoc :running true)))
 
 (defn stop!
   "Stop the renderer and restore terminal state."
   [renderer]
-  (let [{:keys [in-alt-screen hide-cursor]} @renderer]
+  (let [{:keys [in-alt-screen hide-cursor bracketed-paste]} @renderer]
+    (when bracketed-paste
+      (disable-bracketed-paste! renderer))
     (when in-alt-screen
       (exit-alt-screen! renderer))
     (when hide-cursor

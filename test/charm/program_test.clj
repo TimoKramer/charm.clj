@@ -75,7 +75,8 @@
           :state state-atom
           :msg-chan nil
           :running? (atom true)
-          :fps 60}
+          :fps 60
+          :ctrl-c :quit}
          overrides))
 
 (deftest handle-msg-test
@@ -104,6 +105,31 @@
           (is (true? (handle-msg! (ctx (fn [st _] [st nil]) state)
                                   (p/window-size-msg 80 24))))
           (is (= [80 24] @resized)))))
+
+    (testing "ctrl+c quits by default, without reaching update"
+      (let [running? (atom true)
+            seen (atom [])]
+        (is (false? (handle-msg! (ctx (fn [st m] (swap! seen conj m) [st nil])
+                                      (atom {}) :running? running?)
+                                 (msg/key-press "c" :ctrl true))))
+        (is (false? @running?))
+        (is (empty? @seen))))
+
+    (testing ":ctrl-c :message delivers it to update instead"
+      (let [running? (atom true)
+            seen (atom [])]
+        (handle-msg! (ctx (fn [st m] (swap! seen conj m) [st nil])
+                          (atom {}) :running? running? :ctrl-c :message)
+                     (msg/key-press "c" :ctrl true))
+        (is (true? @running?))
+        (is (= 1 (count @seen)))
+        (is (msg/key-match? (first @seen) "ctrl+c"))))
+
+    (testing "a plain c is not ctrl+c"
+      (let [running? (atom true)]
+        (handle-msg! (ctx (fn [st _] [st nil]) (atom {}) :running? running?)
+                     (msg/key-press "c"))
+        (is (true? @running?))))
 
     (testing "quit stops the loop"
       (let [running? (atom true)]

@@ -64,6 +64,8 @@
    :fps 60
    :hide-cursor true
    :sanitize true
+   :bracketed-paste false
+   :ctrl-c :quit
    :color-profile nil    ; nil - detect from the environment
    :dark-background? nil})  ; nil - query the terminal
 
@@ -127,9 +129,14 @@
 
    A quit message stops the loop, and an error stops it and is rethrown so it
    surfaces on the caller's thread."
-  [{:keys [renderer update state msg-chan running?]} m]
+  [{:keys [renderer update state msg-chan running? ctrl-c]} m]
   (cond
     (msg/quit? m)
+    (do (reset! running? false) false)
+
+    ;; Ctrl+C quits unless the application asked to handle it itself, so a
+    ;; program whose `update` ignores it can still be killed from the keyboard.
+    (and (= :quit ctrl-c) (msg/key-match? m "ctrl+c"))
     (do (reset! running? false) false)
 
     (msg/error? m)
@@ -227,6 +234,43 @@
                    :alt (boolean (:alt event))
                    :shift (boolean (:shift event)))))
 
+(def ^:private paste-read-timeout-ms 100)
+
+(def ^:private max-paste-timeouts
+  "Consecutive read timeouts that end a paste that never sent its end marker.
+
+   A paste arrives as one contiguous burst, so a few hundred milliseconds of
+   silence means the terminal is not going to finish it. Without a bound here a
+   truncated paste sequence would keep the input thread in this loop forever and
+   the application would stop seeing input entirely."
+  3)
+
+(defn- read-paste
+  "Collect everything between a paste-start marker and its paste-end.
+
+   Returns the pasted text. Without this the characters arrive as ordinary key
+   presses and the markers are indistinguishable from typed input, so an
+   application cannot tell a paste from someone typing very fast."
+  [^Terminal terminal keymap running?]
+  (let [sb (StringBuilder.)]
+    (loop [timeouts 0]
+      (if (or (not @running?) (>= timeouts max-paste-timeouts))
+        (.toString sb)
+        (let [event (input/read-event terminal
+                                      :timeout-ms paste-read-timeout-ms
+                                      :keymap keymap)]
+          (case (:type event)
+            :paste-end (.toString sb)
+            :runes (do (.append sb ^String (:runes event)) (recur 0))
+            ;; A newline or tab inside a paste is text, not a key press
+            :enter (do (.append sb "\n") (recur 0))
+            :tab (do (.append sb "\t") (recur 0))
+            ;; nil is a read timeout - the paste may still be arriving
+            nil (recur (inc timeouts))
+            ;; Anything else cannot be part of the pasted text; drop it and keep
+            ;; going rather than ending the paste early
+            (recur 0)))))))
+
 (def ^:private max-input-failures
   "Consecutive read failures tolerated before giving up on the terminal.
 
@@ -255,7 +299,10 @@
                        (when-let [event (input/read-event terminal
                                                           :timeout-ms 100
                                                           :keymap keymap)]
-                         (a/put! msg-chan (event->msg event)))
+                         (a/put! msg-chan
+                                 (if (= :paste-start (:type event))
+                                   (msg/paste (read-paste terminal keymap running?))
+                                   (event->msg event))))
                        nil
                        (catch InterruptedException _
                          (reset! running? false)
@@ -353,6 +400,19 @@
                       off only for a view that authors its own control
                       sequences, and then sanitize untrusted parts of it with
                       charm.ansi.sanitize/sanitize.
+     :bracketed-paste - Ask the terminal to bracket pasted text (default:
+                      false). When on, a paste arrives as a single :paste
+                      message carrying the whole text instead of one key press
+                      per character, so an application can tell a paste from
+                      fast typing. Off by default, because a program that only
+                      handles key presses would stop seeing pastes at all.
+     :ctrl-c        - What Ctrl+C does: :quit (default) stops the program
+                      before `update` sees it, so a program that does not
+                      handle it can still be killed from the keyboard;
+                      :message delivers it to `update` as an ordinary
+                      \"ctrl+c\" key press and leaves quitting to the
+                      application. With :message, an application that never
+                      acts on it cannot be interrupted from the keyboard.
      :running?      - Atom to control the event loop externally (default: internal atom)
      :color-profile - :ascii, :ansi, :ansi256 or :true-color, overriding
                       detection (default: nil, detect from $TERM/$COLORTERM)
@@ -371,7 +431,8 @@
    which never answer would otherwise cost at every startup."
   [{:keys [init update view running?] :as opts}]
   (let [opts (merge (default-opts) opts)
-        {:keys [alt-screen mouse focus-reporting fps hide-cursor sanitize]} opts
+        {:keys [alt-screen mouse focus-reporting fps hide-cursor sanitize
+                bracketed-paste ctrl-c]} opts
 
         ;; Create terminal and save original attributes for restoration
         terminal (term/create-terminal)
@@ -390,7 +451,8 @@
                                          :fps fps
                                          :alt-screen alt-screen
                                          :hide-cursor hide-cursor
-                                         :sanitize sanitize)
+                                         :sanitize sanitize
+                                         :bracketed-paste bracketed-paste)
 
         ;; Message channel
         msg-chan (chan 256)
@@ -458,7 +520,8 @@
                             :state state
                             :msg-chan msg-chan
                             :running? running?
-                            :fps fps})
+                            :fps fps
+                            :ctrl-c ctrl-c})
 
           ;; Interrupt input thread
           (.interrupt input-thread))
