@@ -352,6 +352,28 @@ Chainable functions for building styles:
 | `with-align` | Set horizontal alignment |
 | `with-valign` | Set vertical alignment |
 
+### merge-style
+
+```clojure
+(charm/merge-style base-style & options)
+```
+
+A copy of a style with the named options changed. `style` fills in every key, so
+plain `merge` of two styles overwrites the base with the second one's *defaults* -
+nil colors, false attributes - rather than inheriting them:
+
+```clojure
+(def base     (charm/style :fg 240 :padding [0 1]))
+(def selected (charm/merge-style base :fg charm/white :bold true))
+(def dimmed   (charm/merge-style base :faint true))
+
+;; Options are named, so turning something off works too
+(charm/merge-style selected :bold false)
+```
+
+Use the `with-*` functions for a single change and `merge-style` for several, or
+for keys without a `with-*` of their own.
+
 ## Examples
 
 ### Styled Text

@@ -9,7 +9,8 @@
 
      ;; In view function:
      (text-input-view my-input)"
-  (:require [charm.style.core :as style]
+  (:require [charm.components.id :as id]
+            [charm.style.core :as style]
             [charm.message :as msg]
             [clojure.string :as str]))
 
@@ -76,7 +77,7 @@
            char-limit 0
            width 0
            focused true
-           id (rand-int 1000000)}}]
+           id (id/next-id)}}]
   {:type :text-input
    :id id
    :prompt prompt

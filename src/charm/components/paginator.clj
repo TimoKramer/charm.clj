@@ -9,7 +9,8 @@
 
      ;; In view function:
      (paginator-view pager)"
-  (:require [charm.style.core :as style]
+  (:require [charm.components.id :as id]
+            [charm.style.core :as style]
             [charm.message :as msg]))
 
 ;; ---------------------------------------------------------------------------
@@ -53,7 +54,7 @@
            active-dot "•"
            inactive-dot "○"
            arabic-format "%d/%d"
-           id (rand-int 1000000)}}]
+           id (id/next-id)}}]
   {:type :paginator
    :id id
    :total-pages (max 1 total-pages)

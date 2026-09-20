@@ -9,7 +9,8 @@
 
      ;; In view function:
      (progress-view my-progress)"
-  (:require [charm.style.core :as style]))
+  (:require [charm.components.id :as id]
+            [charm.style.core :as style]))
 
 ;; ---------------------------------------------------------------------------
 ;; Progress Bar Styles
@@ -48,7 +49,7 @@
            percent 0.0
            bar-style :default
            show-percent false
-           id (rand-int 1000000)}}]
+           id (id/next-id)}}]
   (let [style-map (if (keyword? bar-style)
                     (get bar-styles bar-style (:default bar-styles))
                     bar-style)]

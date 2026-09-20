@@ -169,7 +169,11 @@
    - A pattern like \"ctrl+c\" (matches with modifiers)
 
    The short spellings \"esc\", \"pgup\" and \"pgdown\" are accepted for
-   :escape, :page-up and :page-down."
+   :escape, :page-up and :page-down.
+
+   A key named on its own matches only the unmodified key: \"c\" does not match
+   Ctrl+C, and \"tab\" does not match Shift+Tab. Name the modifiers to match
+   those."
   [msg key]
   (when (key-press? msg)
     (let [msg-key (:key msg)
@@ -185,9 +189,14 @@
                (if (contains? mods "shift") (:shift msg) (not (:shift msg)))
                (= key-part msg-name)))
 
-        ;; A key name, as a keyword (:up) or a string (\"up\", \"q\")
+        ;; A key name, as a keyword (:up) or a string ("up", "q"). A name on its
+        ;; own means the unmodified key: "c" must not also fire on Ctrl+C, or an
+        ;; application cannot bind the two to different things.
         (or (keyword? key) (string? key))
-        (= (key-name key) msg-name)
+        (and (not (:ctrl msg))
+             (not (:alt msg))
+             (not (:shift msg))
+             (= (key-name key) msg-name))
 
         :else false))))
 

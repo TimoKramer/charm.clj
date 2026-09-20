@@ -8,7 +8,8 @@
 
      ;; In view function:
      (help-view my-help)"
-  (:require [charm.style.core :as style]
+  (:require [charm.components.id :as id]
+            [charm.style.core :as style]
             [clojure.string :as str]))
 
 ;; ---------------------------------------------------------------------------
@@ -38,7 +39,7 @@
                     separator " • "
                     show-all false
                     ellipsis "…"
-                    id (rand-int 1000000)}}]
+                    id (id/next-id)}}]
   {:type :help
    :id id
    :bindings (vec (map (fn [b]

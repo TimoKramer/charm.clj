@@ -83,21 +83,3 @@
            (k/make-key {:type :runes :runes "c" :ctrl true})))
     (is (= {:type :up :shift true :alt true}
            (k/make-key {:type :up :shift true :alt true})))))
-
-(deftest key-matches?-test
-  (testing "matches by keyword"
-    (is (k/key-matches? {:type :enter} :enter))
-    (is (not (k/key-matches? {:type :tab} :enter))))
-
-  (testing "matches by map"
-    (is (k/key-matches? {:type :runes :runes "c" :ctrl true}
-                        {:type :runes :ctrl true}))
-    (is (not (k/key-matches? {:type :runes :runes "c"}
-                             {:ctrl true}))))
-
-  (testing "matches by string pattern"
-    (is (k/key-matches? {:type :runes :runes "c" :ctrl true} "ctrl+c"))
-    (is (k/key-matches? {:type :runes :runes "x" :alt true} "alt+x"))
-    (is (k/key-matches? {:type :enter} "enter"))
-    (is (k/key-matches? {:type :up :shift true} "shift+up"))
-    (is (not (k/key-matches? {:type :runes :runes "c"} "ctrl+c")))))

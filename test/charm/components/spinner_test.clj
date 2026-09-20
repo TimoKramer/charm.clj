@@ -101,3 +101,13 @@
     (let [s (spinner/spinner :dots :id 42)
           msg (spinner/tick-msg 99 0)]
       (is (not (spinner/spinning? s msg))))))
+
+(deftest unique-ids-test
+  (testing "each component gets its own id"
+    ;; The spinner and the timer route their tick messages back to themselves by
+    ;; comparing ids, so a collision makes two of them drive each other
+    (let [ids (repeatedly 500 #(:id (spinner/spinner :dots)))]
+      (is (= 500 (count (distinct ids))))))
+
+  (testing "an explicit id is still honoured"
+    (is (= 42 (:id (spinner/spinner :dots :id 42))))))

@@ -156,4 +156,10 @@
   (testing "more lines than the height keeps the last ones"
     (let [written (render-to-bytes "one\ntwo\nthree" :size [40 2])]
       (is (not (re-find #"one" written)))
-      (is (re-find #"three" written)))))
+      (is (re-find #"three" written))))
+
+  (testing ":overflow :bottom keeps the first ones instead"
+    ;; A full-screen view one line too tall should not lose its title
+    (let [written (render-to-bytes "one\ntwo\nthree" :size [40 2] :overflow :bottom)]
+      (is (re-find #"one" written))
+      (is (not (re-find #"three" written))))))

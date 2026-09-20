@@ -27,6 +27,7 @@ Run a TUI program with the Elm Architecture pattern.
 | `:sanitize` | boolean | `true` | Drop every escape sequence but SGR styling from the view |
 | `:bracketed-paste` | boolean | `false` | Deliver a paste as one [`:paste` message](messages.md#paste-messages) |
 | `:ctrl-c` | keyword | `:quit` | `:quit` stops the program; `:message` delivers Ctrl+C to `update` |
+| `:overflow` | keyword | `:top` | Which end to drop lines from when the view is too tall |
 | `:color-profile` | keyword | `nil` | `:ascii`, `:ansi`, `:ansi256` or `:true-color`; `nil` detects from `TERM`/`COLORTERM` |
 | `:dark-background?` | boolean | `nil` | `nil` queries the terminal |
 
@@ -47,6 +48,19 @@ the state `identical?` renders nothing at all.
 `:fps` is therefore a ceiling on redraws, not a polling rate: an idle program
 does no work beyond waking once a frame to notice that it should still be
 running.
+
+### Views taller than the terminal
+
+A view with more lines than the terminal has rows gets trimmed, and `:overflow`
+decides which end goes:
+
+- `:top` (default) keeps the **last** lines. Right for an inline program, where
+  the newest output is at the bottom.
+- `:bottom` keeps the **first** lines. Usually right for a full-screen program —
+  otherwise a view one line too tall loses its title, with nothing to say it did.
+
+Neither scrolls. For content that should scroll, use the viewport component
+rather than letting the renderer trim.
 
 ### Ctrl+C
 

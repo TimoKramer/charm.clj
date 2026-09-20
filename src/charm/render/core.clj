@@ -23,10 +23,14 @@
      :hide-cursor - Hide cursor during rendering (default: true)
      :sanitize    - Drop everything but SGR styling from rendered content
                     (default: true)
-     :bracketed-paste - Ask the terminal to bracket pasted text (default: false)"
-  [^Terminal terminal & {:keys [fps alt-screen hide-cursor sanitize bracketed-paste]
+     :bracketed-paste - Ask the terminal to bracket pasted text (default: false)
+     :overflow    - Which end to drop lines from when the view is taller than
+                    the terminal: :top (default) or :bottom"
+  [^Terminal terminal & {:keys [fps alt-screen hide-cursor sanitize bracketed-paste
+                                overflow]
                          :or {fps 60 alt-screen false hide-cursor true
-                              sanitize true bracketed-paste false}}]
+                              sanitize true bracketed-paste false
+                              overflow :top}}]
   (let [{:keys [width height]} (term/get-size terminal)
         display (doto (Display. terminal false)
                   (.resize height width))]
@@ -38,6 +42,7 @@
            :hide-cursor hide-cursor
            :sanitize sanitize
            :bracketed-paste bracketed-paste
+           :overflow overflow
            :width width
            :height height
            :running false})))
@@ -194,13 +199,18 @@
    part application text and part data the application did not author, and the
    renderer is the one place that sees all of it."
   [renderer content]
-  (let [{:keys [^Display display width height sanitize]} @renderer
+  (let [{:keys [^Display display width height sanitize overflow]} @renderer
         content (if (empty? content) " " content)
         content (if sanitize (san/sanitize content) content)
         lines (scr/content->lines content)
-        ;; Truncate to height (keep last lines if overflow)
+        ;; Drop whichever end :overflow names when the view is too tall. Dropping
+        ;; from the top suits an inline program, where the newest output is at the
+        ;; bottom; a full-screen one usually wants its first lines kept, or a view
+        ;; one line too tall loses its title without saying so.
         lines (if (and (pos? height) (> (count lines) height))
-                (subvec lines (- (count lines) height))
+                (if (= :bottom overflow)
+                  (subvec lines 0 height)
+                  (subvec lines (- (count lines) height)))
                 lines)
         ;; One parse per line. Going through a string-returning truncate meant
         ;; parsing each line up to three times a frame - once to measure, once

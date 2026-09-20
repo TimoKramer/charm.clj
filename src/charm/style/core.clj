@@ -83,6 +83,25 @@
 ;; Style Modifiers
 ;; ---------------------------------------------------------------------------
 
+(defn merge-style
+  "A copy of `s` with the named options changed.
+
+   `style` fills in every key, so `(merge base variant)` overwrites the base with
+   the variant's *defaults* - nil colors, false attributes - instead of
+   inheriting them. This changes only the options given, which is what building a
+   variant of a base style wants:
+
+     (def base (style :fg 240 :padding [0 1]))
+     (def selected (merge-style base :fg :white :bold true))
+
+   Because the options are named rather than taken from another style map, there
+   is no guessing about which keys were meant: `(merge-style base :bold false)`
+   turns bold off."
+  [s & {:as opts}]
+  (cond-> (merge s opts)
+    (:padding opts) (update :padding l/normalize-box)
+    (:margin opts) (update :margin l/normalize-box)))
+
 (defn with-fg
   "Set foreground color."
   [s color]

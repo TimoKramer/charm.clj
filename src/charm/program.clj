@@ -66,6 +66,7 @@
    :sanitize true
    :bracketed-paste false
    :ctrl-c :quit
+   :overflow :top
    :color-profile nil    ; nil - detect from the environment
    :dark-background? nil})  ; nil - query the terminal
 
@@ -419,6 +420,11 @@
                       per character, so an application can tell a paste from
                       fast typing. Off by default, because a program that only
                       handles key presses would stop seeing pastes at all.
+     :overflow      - Which end to drop lines from when the view is taller than
+                      the terminal: :top (default) keeps the last lines, which
+                      suits an inline program; :bottom keeps the first ones,
+                      which is usually what a full-screen program wants, since
+                      otherwise a view one line too tall loses its title.
      :ctrl-c        - What Ctrl+C does: :quit (default) stops the program
                       before `update` sees it, so a program that does not
                       handle it can still be killed from the keyboard;
@@ -445,7 +451,7 @@
   [{:keys [init update view running?] :as opts}]
   (let [opts (merge (default-opts) opts)
         {:keys [alt-screen mouse focus-reporting fps hide-cursor sanitize
-                bracketed-paste ctrl-c]} opts
+                bracketed-paste ctrl-c overflow]} opts
 
         ;; Create terminal and save original attributes for restoration
         terminal (term/create-terminal)
@@ -465,7 +471,8 @@
                                          :alt-screen alt-screen
                                          :hide-cursor hide-cursor
                                          :sanitize sanitize
-                                         :bracketed-paste bracketed-paste)
+                                         :bracketed-paste bracketed-paste
+                                         :overflow overflow)
 
         ;; Message channel
         msg-chan (chan 256)

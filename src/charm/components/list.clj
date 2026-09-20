@@ -9,7 +9,8 @@
 
      ;; In view function:
      (list-view my-list)"
-  (:require [charm.style.core :as style]
+  (:require [charm.components.id :as id]
+            [charm.style.core :as style]
             [charm.message :as msg]
             [clojure.string :as str]))
 
@@ -86,7 +87,7 @@
                  item-prefix "  "
                  show-descriptions false
                  infinite-scroll false
-                 id (rand-int 1000000)}}]
+                 id (id/next-id)}}]
   {:type :list
    :id id
    :items (vec items)

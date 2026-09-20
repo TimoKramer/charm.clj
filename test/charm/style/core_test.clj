@@ -150,3 +150,32 @@
       (is (= 8 w))
       ;; padding: 1+1, border: 1+1, margin: 1+1 = 6
       (is (= 6 h)))))
+
+(deftest merge-style-test
+  (let [base (s/style :fg c/red :padding [0 1] :width 20)]
+    (testing "changes only the named options"
+      (let [variant (s/merge-style base :fg c/blue :bold true)]
+        (is (= c/blue (:fg variant)))
+        (is (true? (:bold variant)))
+        ;; inherited, not reset to the constructor default
+        (is (= [0 1] (:padding variant)))
+        (is (= 20 (:width variant)))))
+
+    (testing "plain merge of two styles is what this avoids"
+      ;; (merge base (style :bold true)) would overwrite :fg with nil
+      (is (nil? (:fg (merge base (s/style :bold true)))))
+      (is (= c/red (:fg (s/merge-style base :bold true)))))
+
+    (testing "an option can be turned back off"
+      (let [bolded (s/merge-style base :bold true)]
+        (is (false? (:bold (s/merge-style bolded :bold false))))))
+
+    (testing "a bare padding or margin value is normalized, as in style"
+      (is (= [2] (:padding (s/merge-style base :padding 2))))
+      (is (= [3] (:margin (s/merge-style base :margin 3)))))
+
+    (testing "with no options it is a copy"
+      (is (= base (s/merge-style base))))
+
+    (testing "the result renders"
+      (is (str/includes? (s/render (s/merge-style base :fg c/blue) "hi") "hi")))))

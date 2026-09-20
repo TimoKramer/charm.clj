@@ -12,6 +12,7 @@
      ;; In view function:
      (viewport-view vp)"
   (:require
+   [charm.components.id :as id]
    [charm.ansi.width :as w]
    [charm.message :as msg]
    [clojure.string :as str]))
@@ -62,7 +63,7 @@
               :or {width 0
                    height 0
                    y-offset 0
-                   id (rand-int 1000000)}}]
+                   id (id/next-id)}}]
   (let [lines (split-content content)]
     {:type :viewport
      :id id

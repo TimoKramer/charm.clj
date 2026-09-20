@@ -68,6 +68,20 @@
     (is (msg/key-match? (msg/key-press :page-up :ctrl true) "ctrl+pgup"))
     (is (not (msg/key-match? (msg/key-press "c") "ctrl+c"))))
 
+  (testing "a bare key name matches only the unmodified key"
+    ;; Otherwise an application cannot bind "c" and "ctrl+c" to different things
+    (is (not (msg/key-match? (msg/key-press "c" :ctrl true) "c")))
+    (is (not (msg/key-match? (msg/key-press "x" :alt true) "x")))
+    (is (not (msg/key-match? (msg/key-press :tab :shift true) "tab")))
+    (is (not (msg/key-match? (msg/key-press :tab :shift true) :tab)))
+    ;; and still matches when nothing is held
+    (is (msg/key-match? (msg/key-press "c") "c"))
+    (is (msg/key-match? (msg/key-press :tab) "tab")))
+
+  (testing "an uppercase letter carries no shift, so it still matches"
+    ;; The input layer reports G as a rune without a shift flag
+    (is (msg/key-match? (msg/key-press "G") "G")))
+
   (testing "key-match? with non-key-press"
     (is (not (msg/key-match? (msg/quit) "q")))))
 

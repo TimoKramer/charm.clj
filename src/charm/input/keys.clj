@@ -122,29 +122,3 @@
     ctrl  (assoc :ctrl true)
     alt   (assoc :alt true)
     shift (assoc :shift true)))
-
-(defn key-matches?
-  "Check if a key event matches a pattern.
-   Pattern can be:
-   - A string like \"ctrl+c\", \"alt+x\", \"enter\"
-   - A key type keyword like :enter, :up
-   - A map like {:type :runes :runes \"c\" :ctrl true}"
-  [key pattern]
-  (cond
-    (keyword? pattern)
-    (= (:type key) pattern)
-
-    (map? pattern)
-    (every? (fn [[k v]] (= (get key k) v)) pattern)
-
-    (string? pattern)
-    (let [parts (str/split (str/lower-case pattern) #"\+")
-          mods (set (butlast parts))
-          key-part (last parts)]
-      (and (if (contains? mods "ctrl") (:ctrl key) (not (:ctrl key)))
-           (if (contains? mods "alt") (:alt key) (not (:alt key)))
-           (if (contains? mods "shift") (:shift key) (not (:shift key)))
-           (or (= key-part (name (:type key)))
-               (= key-part (:runes key)))))
-
-    :else false))

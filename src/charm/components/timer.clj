@@ -9,7 +9,8 @@
 
      ;; In view function:
      (timer-view my-timer)"
-  (:require [charm.style.core :as style]))
+  (:require [charm.components.id :as id]
+            [charm.style.core :as style]))
 
 ;; ---------------------------------------------------------------------------
 ;; Timer Messages
@@ -62,7 +63,7 @@
       :or {timeout 0
            interval 1000
            running true
-           id (rand-int 1000000)}}]
+           id (id/next-id)}}]
   {:type :timer
    :id id
    :timeout timeout      ; remaining time in ms

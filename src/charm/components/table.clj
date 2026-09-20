@@ -12,6 +12,7 @@
      ;; In view function:
      (table-view tbl)"
   (:require
+   [charm.components.id :as id]
    [charm.ansi.width :as w]
    [charm.message :as msg]
    [charm.style.core :as style]
@@ -62,7 +63,7 @@
                           keys id]
                    :or {height 0
                         header? true
-                        id (rand-int 1000000)}}]
+                        id (id/next-id)}}]
   {:type :table
    :id id
    :columns (vec columns)

@@ -9,7 +9,8 @@
 
      ;; In view function:
      (spinner-view my-spinner)"
-  (:require [charm.style.core :as style]))
+  (:require [charm.components.id :as id]
+            [charm.style.core :as style]))
 
 ;; ---------------------------------------------------------------------------
 ;; Spinner Types
@@ -91,7 +92,7 @@
    Options:
      :style - Style to apply to spinner (optional)
      :id    - Unique ID for this spinner (optional)"
-  [type & {:keys [style id] :or {id (rand-int 1000000)}}]
+  [type & {:keys [style id] :or {id (id/next-id)}}]
   (let [spinner-type (if (keyword? type)
                        (get spinner-types type (:dots spinner-types))
                        type)]
