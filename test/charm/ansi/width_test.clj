@@ -1,5 +1,6 @@
 (ns charm.ansi.width-test
   (:require [clojure.test :refer [deftest is testing]]
+            [clojure.string :as str]
             [charm.ansi.width :as w]))
 
 (deftest strip-ansi-test
@@ -48,7 +49,21 @@
 
   (testing "nil/empty handling"
     (is (nil? (w/truncate nil 10)))
-    (is (= "" (w/truncate "" 10)))))
+    (is (= "" (w/truncate "" 10))))
+
+  (testing "keeps the styling of the part that survives"
+    ;; str on an AttributedString returns plain text, so this used to come back
+    ;; unstyled - every over-wide styled line lost its color
+    (let [styled "\033[31mred-and-long\033[0m"]
+      (is (= 12 (w/string-width styled)))
+      (let [cut (w/truncate styled 5 :tail "")]
+        (is (str/includes? cut "\033[31m"))
+        (is (= "red-a" (w/strip-ansi cut))))))
+
+  (testing "the tail itself is unstyled"
+    (let [cut (w/truncate "\033[31m0123456789\033[0m" 6 :tail "...")]
+      (is (= "012..." (w/strip-ansi cut)))
+      (is (str/ends-with? cut "...")))))
 
 (deftest pad-test
   (testing "pad-right"

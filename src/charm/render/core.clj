@@ -202,10 +202,15 @@
         lines (if (and (pos? height) (> (count lines) height))
                 (subvec lines (- (count lines) height))
                 lines)
-        ;; Truncate each line to width and convert to AttributedString
+        ;; One parse per line. Going through a string-returning truncate meant
+        ;; parsing each line up to three times a frame - once to measure, once
+        ;; to cut, once to hand to Display - and the cut lost the line's styling
+        ;; on the way back through a plain string.
         attributed (mapv (fn [line]
-                           (AttributedString/fromAnsi
-                            (scr/truncate-line line width)))
+                           (let [^AttributedString parsed (AttributedString/fromAnsi line)]
+                             (if (and (pos? width) (> (.columnLength parsed) width))
+                               (.columnSubSequence parsed 0 (int width))
+                               parsed)))
                          lines)]
     ;; Display.update handles all the diffing internally.
     ;; Convert to ArrayList because JLine mutates the list internally

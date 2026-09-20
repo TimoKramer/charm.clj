@@ -4,7 +4,6 @@
    For cursor movement, screen clearing, and alt screen, use charm.terminal
    which uses JLine's capability-based approach for better terminal compatibility."
   (:require [charm.ansi.sanitize :as san]
-            [charm.ansi.width :as w]
             [clojure.string :as str])
   (:import [java.util Base64]))
 
@@ -92,9 +91,3 @@
       (str/replace "\r\n" "\n")
       (str/split-lines)))
 
-(defn truncate-line
-  "Truncate a line to fit within terminal width."
-  [line width]
-  (if (or (<= width 0) (<= (w/string-width line) width))
-    line
-    (w/truncate line width :tail "")))

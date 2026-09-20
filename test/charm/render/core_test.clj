@@ -86,7 +86,9 @@
         (is (false? (:in-alt-screen @renderer)))))))
 
 (defn- render-to-bytes
-  "Render `content` into a dumb terminal and return what was written."
+  "Render `content` into a dumb terminal and return what was written.
+
+   Pass `:size [width height]` to fix the renderer's dimensions."
   [content & opts]
   (let [input (java.io.ByteArrayInputStream. (byte-array 0))
         output (java.io.ByteArrayOutputStream.)
@@ -94,7 +96,10 @@
                      (.dumb true)
                      (.streams input output)
                      (.build))
-        renderer (apply r/create-renderer terminal opts)]
+        opts (apply hash-map opts)
+        [w h] (:size opts)
+        renderer (apply r/create-renderer terminal (apply concat (dissoc opts :size)))]
+    (when w (swap! renderer assoc :width w :height h))
     (try
       (r/render! renderer content)
       (.flush (.writer terminal))
@@ -128,3 +133,27 @@
     (let [written (render-to-bytes "\u001b[31mred\u001b[0m")]
       (is (re-find #"\u001b\[" written))
       (is (re-find #"red" written)))))
+
+(deftest render-truncation-test
+  (testing "a line wider than the terminal is cut to the width"
+    (let [written (render-to-bytes "0123456789" :size [4 1])]
+      (is (re-find #"0123" written))
+      (is (not (re-find #"456789" written)))))
+
+  (testing "a cut line keeps its styling"
+    ;; The renderer used to truncate through a plain string, which dropped the
+    ;; styling of every line too wide for the terminal
+    (let [written (render-to-bytes "\u001b[31m0123456789\u001b[0m" :size [4 1])]
+      (is (re-find #"\u001b\[31m" written))
+      (is (re-find #"0123" written))
+      (is (not (re-find #"456789" written)))))
+
+  (testing "a line that fits is untouched"
+    (let [written (render-to-bytes "\u001b[31mred\u001b[0m" :size [40 1])]
+      (is (re-find #"\u001b\[31m" written))
+      (is (re-find #"red" written))))
+
+  (testing "more lines than the height keeps the last ones"
+    (let [written (render-to-bytes "one\ntwo\nthree" :size [40 2])]
+      (is (not (re-find #"one" written)))
+      (is (re-find #"three" written)))))

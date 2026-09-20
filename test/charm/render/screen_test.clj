@@ -52,12 +52,3 @@
   (testing "handles CRLF"
     (is (= ["a" "b"] (scr/content->lines "a\r\nb")))))
 
-(deftest truncate-line-test
-  (testing "truncates long lines"
-    (is (= "hell" (scr/truncate-line "hello" 4))))
-
-  (testing "leaves short lines alone"
-    (is (= "hi" (scr/truncate-line "hi" 10))))
-
-  (testing "handles zero width"
-    (is (= "hello" (scr/truncate-line "hello" 0)))))

@@ -27,8 +27,11 @@
   (.columnLength attr-s))
 
 (defn column-sub-sequence
-  "Get a column-based subsequence of an AttributedString."
-  [^AttributedString attr-s start end]
+  "Get a column-based subsequence of an AttributedString.
+
+   The result keeps the styling of the columns it covers - unlike `str` on it,
+   which returns the plain text and drops the styling silently."
+  ^AttributedString [^AttributedString attr-s start end]
   (.columnSubSequence attr-s (int start) (int end)))
 
 (defn string-width
@@ -58,7 +61,8 @@
    Options:
      :tail - String to append when truncated (default \"...\")
 
-   The tail is included in the width calculation.
+   The tail is included in the width calculation. Styling on the part that
+   survives is preserved; the tail itself is unstyled.
 
    Example:
      (truncate \"hello world\" 8)           ; => \"hello...\"
@@ -74,7 +78,9 @@
               target-width (- width tail-width)]
           (if (neg? target-width)
             ""
-            (str (column-sub-sequence attr-s 0 target-width) tail)))))))
+            ;; .toAnsi, not str: str on an AttributedString returns the plain
+            ;; text, so truncating a styled line used to strip its styling
+            (str (.toAnsi (column-sub-sequence attr-s 0 target-width)) tail)))))))
 
 (defn repeat-char
   "Build a string of `n` copies of `c`, without going through a seq."
