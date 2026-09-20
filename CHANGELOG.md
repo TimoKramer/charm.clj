@@ -56,6 +56,11 @@ and an event loop that no longer caps input at about 100 messages a second.
 
 ### Changed
 
+- **Each line is parsed once per frame.** `render!` measured a line, cut it
+  through a string-returning truncate, then parsed the result again - up to three
+  `AttributedString/fromAnsi` passes per line per frame. Measured on 40 lines of
+  80 styled columns: 165 µs to 83 µs when the lines fit, 312 µs to 116 µs when
+  they need cutting.
 - **The event loop blocks for messages instead of polling, and renders once a
   frame.** It used to sleep 10 ms every iteration and then handle exactly one
   message, so every keystroke waited up to 10 ms and throughput was capped near
@@ -164,6 +169,11 @@ and an event loop that no longer caps input at about 100 messages a second.
 
 ### Fixed
 
+- **Truncating a styled line no longer strips its styling.** `str` on an
+  `AttributedString` returns the plain text, so `truncate` discarded the styling
+  that `columnSubSequence` had just preserved - an over-long red line came back
+  as bare text. This affected the renderer, viewport lines, table cells and
+  `style/truncate` itself. The tail stays unstyled, as before.
 - **A failing terminal reader no longer spins a core.** Every exception in the
   input thread was caught and discarded with no backoff. It now backs off
   exponentially, and after ten consecutive failures reports an error and stops

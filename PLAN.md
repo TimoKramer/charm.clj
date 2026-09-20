@@ -111,7 +111,7 @@ into `handle-msg!`, which renders only when `update` returned a state that is
 not `identical?` to the old one. A resize passes `:force-render? true`, since
 the frame changed even when the application ignored the message.
 
-### P4 — Every line is ANSI-parsed twice per frame
+### P4 — Every line is ANSI-parsed twice per frame — **done**
 
 `render!` calls `scr/truncate-line` (→ `w/string-width` →
 `AttributedString/fromAnsi`) and then `AttributedString/fromAnsi` again on the
@@ -122,6 +122,26 @@ using `.columnLength` / `.columnSubSequence`.
 
 **Suggestion:** parse each line to an `AttributedString` once in `render!` and
 truncate on that.
+
+**Resolved**, and it was three parses, not two: measure (`string-width`), cut
+(`truncate`, which parses again), then parse the cut result to hand to `Display`.
+
+Measured on 40 lines of 80 styled columns, better than the estimate:
+
+| per frame | before | after |
+|---|---|---|
+| lines fit the width | 165.1 µs | 82.6 µs |
+| lines need cutting | 312.1 µs | 116.2 µs |
+
+**It was also a correctness bug, which the item did not mention.** `str` on an
+`AttributedString` returns the plain text, so `w/truncate` discarded the styling
+`columnSubSequence` had just preserved — `(w/truncate "\e[31mred-and-long\e[0m" 5)`
+came back as `"red-a"`, no escapes. Every line too wide for its container
+rendered unstyled: in the renderer, in viewport lines, in table cells, and for
+anyone calling the public `style/truncate`. `w/truncate` now serialises with
+`.toAnsi`; the tail stays unstyled as before.
+
+`screen/truncate-line` had exactly one caller and went with it.
 
 ### P5 — The styling stack round-trips through ANSI strings at every layer
 
