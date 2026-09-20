@@ -17,6 +17,28 @@ With timeout (milliseconds)
 The REPL session persists between evaluations - namespaces and state are maintained.
 Always use `:reload` when requiring namespaces to pick up changes.
 
+# API Stability
+
+charm.clj is a library. Its public API is used by applications we cannot see, so a
+break is a cost to justify before making it, not a note to add afterwards.
+
+Public is every namespace whose `ns` form does *not* carry `^:no-doc`:
+`charm.program`, `charm.message`, `charm.style.core`, `charm.style.border`,
+`charm.style.overlay`, `charm.ansi.sanitize` and the components. Everything marked
+`^:no-doc` is internal and free to change.
+
+- Prefer adding to the API over changing it. A new option whose default preserves
+  today's behaviour breaks nobody.
+- A nicer design is not a serious reason. Do not change what an existing function
+  returns, or what an existing option means, to tidy something up.
+- Serious reasons: a bug that cannot be fixed otherwise, a security problem, or a
+  documented feature that never worked. Say which one applies.
+- Prefer a break that fails loudly over one that keeps compiling and quietly
+  behaves differently.
+- Deprecate before deleting when it costs little.
+- Record every break in `CHANGELOG.md`, marked **Potentially breaking**, and write
+  an ADR when the reasoning is worth keeping.
+
 # Code Style
 
 ## Keep it simple
