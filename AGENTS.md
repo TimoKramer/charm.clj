@@ -55,6 +55,8 @@ Use [Conventional Commits](https://www.conventionalcommits.org/): `type: descrip
 
 Types: `feat`, `fix`, `refactor`, `perf`, `test`, `docs`, `chore`
 
+Never mention a plan because a plan is ephemeral and internal. Rather propose to write an ADR instead.
+
 # Testing
 
 ## Running examples
