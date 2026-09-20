@@ -855,7 +855,7 @@ heavily with the ~500 hand-rolled lines in `charm.input.keys` +
 through `KeyParser.parse` and diff coverage. If it covers the table, delete
 code; if not, document the gap in ADR 004 and keep the keymap.
 
-### J3 — `ScreenTerminal` for integration tests
+### J3 — `ScreenTerminal` for integration tests — **done**
 
 `org.jline.utils.ScreenTerminal` (consolidated 4.2, scrollback + cell decoding
 exposed 4.3.0) is a full in-memory VT emulator: `write` the renderer's output,
@@ -871,6 +871,27 @@ commented out in `ci.yml`).
 
 **Suggestion:** add a test helper that renders a frame into a `ScreenTerminal`
 and returns the grid; migrate the brittle byte-level assertions; update ADR 003.
+
+**Resolved:** `charm.test.screen` plus 25 assertions in
+`charm.integration.screen-test`. ADR 003 gained a dated addendum rather than an
+edit, since it records a decision already made.
+
+Two things the item did not mention. The size has to be given to the
+`TerminalBuilder` as well as the renderer: `Display` takes its width from the
+terminal, and one that thinks the screen is wider pads with a cursor-forward,
+which lands the next line a column over. And the cell accessors are *static*
+methods on `ScreenTerminal`, not instance ones. `render-to-bytes` had the same
+sizing mistake, which its substring assertions hid.
+
+The byte-level tests were kept rather than migrated wholesale: "this OSC never
+reached the terminal" is a statement about the wire, not the screen, and that is
+where the sanitiser's guarantees live.
+
+**These tests cannot run under babashka.** `ScreenTerminal` is not in its image,
+and a namespace naming it fails to load at analysis time, so they live in
+`test-jvm/`, which `deps.edn` lists and `bb.edn` does not. The ask to babashka is
+small if it is ever worth making - the class has no dependencies outside the JDK
+and three JLine classes already in the image, and needs no `reify`, unlike J6.
 
 ### J4 — `Terminal.trackMouse` now covers SGR
 
