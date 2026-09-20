@@ -867,7 +867,7 @@ Two smaller things deliberately left alone until then, both invisible today:
 Both disappear with the renderer-owned environment, so fixing them now would be
 wasted work.
 
-### J2 — `KeyEvent` / `KeyParser`: revisit ADR 004
+### J2 — `KeyEvent` / `KeyParser`: revisit ADR 004 — **spiked, not adopted**
 
 `org.jline.terminal.KeyParser/parse` (static, non-blocking — none of ADR 004's
 BindingReader objections apply) returns a structured `KeyEvent`: type
@@ -879,6 +879,24 @@ heavily with the ~500 hand-rolled lines in `charm.input.keys` +
 **Suggestion:** spike — run the corpus from `test/charm/input/keys_test.clj`
 through `KeyParser.parse` and diff coverage. If it covers the table, delete
 code; if not, document the gap in ADR 004 and keep the keymap.
+
+**Done, and the keymap stays.** The corpus came from the keymap's own tables
+rather than the test file, so it covers all 259 sequences charm binds including the
+generated modifier combinations: 209 agree, **0 disagree**, 50 cannot be parsed.
+
+Three independent reasons not to adopt it, any one of which would be enough: the
+50 gaps include focus reporting, bracketed paste, the SS3 arrows and F13–F20, all
+of which charm supports today; `KeyParser` is hardcoded where `KeyMap` binds from
+terminfo; and neither `KeyParser` nor `KeyEvent` is in babashka's image, while
+`KeyMap` is. Input is core, so there is no `test-jvm`-style exclusion available.
+
+Written up as a dated addendum to [ADR 004](adr/004-jline-input-api-choices.md),
+which it confirms rather than revises.
+
+The zero disagreements are worth more than the decision: they independently
+validate a table charm generates itself. `charm.input.keyparser-test` now keeps
+that check standing, and fails if JLine closes one of the gaps — which is the
+signal to revisit.
 
 ### J3 — `ScreenTerminal` for integration tests — **done**
 
