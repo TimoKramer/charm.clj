@@ -16,6 +16,14 @@ and an event loop that no longer caps input at about 100 messages a second.
 
 ### Added
 
+- **`merge-style`**, which returns a copy of a style with the named options
+  changed. `(merge base variant)` overwrites the base with the variant's
+  *defaults* - nil colors, false attributes - rather than inheriting them, which
+  is the opposite of what building a variant of a base style wants.
+- **`:overflow` option on `run`**, deciding which end the renderer drops lines
+  from when a view is taller than the terminal. `:top` (the default, unchanged
+  behaviour) keeps the last lines; `:bottom` keeps the first ones, which is
+  usually what a full-screen program wants.
 - **`:bracketed-paste` option on `run`** (default `false`). With it on, a paste
   arrives as a single `:paste` message carrying the whole text, instead of one
   key press per character that an application cannot tell apart from fast
@@ -56,6 +64,10 @@ and an event loop that no longer caps input at about 100 messages a second.
 
 ### Changed
 
+- **`charm.input.keys/key-matches?` is gone.** It duplicated `msg/key-match?`'s
+  pattern logic against event maps rather than messages, and had no callers.
+  `msg/key-match?` is the one entry point. **Potentially breaking** for anything
+  reaching into that internal namespace.
 - **Each line is parsed once per frame.** `render!` measured a line, cut it
   through a string-returning truncate, then parsed the result again - up to three
   `AttributedString/fromAnsi` passes per line per frame. Measured on 40 lines of
@@ -169,6 +181,19 @@ and an event loop that no longer caps input at about 100 messages a second.
 
 ### Fixed
 
+- **Styling no longer rewrites line-drawing characters as ASCII.** JLine's
+  `toAnsi` both emits a style's escapes and rewrites characters it assumes the
+  terminal cannot show, so `(style/render (style/style :border normal :border-fg
+  :red) "hi")` drew `+--+` while the same border unstyled drew `┌──┐`.
+  Compositing had it too: placing a panel over a bordered base turned the base's
+  `│` and `─` into `|` and `-`.
+- **Component ids cannot collide.** They were `(rand-int 1000000)`, and the
+  spinner and timer route their tick messages back to themselves by comparing
+  ids, so two components sharing one drove each other.
+- **`key-match?` no longer ignores modifiers when the pattern names none.** `"c"`
+  also fired on Ctrl+C, so an application could not bind the two to different
+  things. `"ctrl+c"` is unaffected, and an uppercase letter carries no shift flag
+  so `"G"` still matches.
 - **Truncating a styled line no longer strips its styling.** `str` on an
   `AttributedString` returns the plain text, so `truncate` discarded the styling
   that `columnSubSequence` had just preserved - an over-long red line came back

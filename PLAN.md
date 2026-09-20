@@ -573,7 +573,7 @@ with the offending string.
 so the stored value is a vector whichever entry point built it. The `hex` half
 landed with U1.
 
-### U12 — `key-match?` ignores modifiers unless the pattern names one
+### U12 — `key-match?` ignores modifiers unless the pattern names one — **done**
 
 `(msg/key-match? (msg/key-press "c" :ctrl true) "c")` is `true`: only the
 `"ctrl+x"` branch looks at `:ctrl` / `:alt` / `:shift`, so a plain `"c"` binding
@@ -584,6 +584,10 @@ missing name.
 **Suggestion:** require the message's modifiers to be unset when the pattern
 names none, and check the repo's own bindings for anything that was relying on
 the loose match.
+
+**Resolved:** a bare name now requires the modifiers to be unset. Checked before
+changing it: every component default binding still fires, and uppercase letters
+arrive as runes with no shift flag, so `"G"` still matches.
 
 ### U5 — Bracketed paste is built but never wired up — **done**
 
@@ -631,14 +635,18 @@ fourteen examples in this repository uses `"ctrl+c"` only to quit, so the new
 default is behaviour-preserving for all of them and their bindings simply became
 redundant.
 
-### U7 — Overflowing views are truncated from the top
+### U7 — Overflowing views are truncated from the top — **done**
 
 `src/charm/render/core.clj:184` keeps the *last* `height` lines. Sensible inline;
 surprising full-screen, where a view one line too tall silently loses its title.
 
 **Suggestion:** document it, and make the direction configurable.
 
-### U8 — Component IDs are `(rand-int 1000000)`
+**Resolved:** `:overflow` on `run`, `:top` (unchanged default) or `:bottom`,
+documented in `doc/api/program.md` with why a full-screen program usually wants
+the other one.
+
+### U8 — Component IDs are `(rand-int 1000000)` — **done**
 
 `src/charm/components/list.clj:88`, `src/charm/components/text_input.clj:79`,
 `src/charm/components/viewport.clj:66`. ~1% collision chance at 150 components,
@@ -646,14 +654,21 @@ and it makes component state non-reproducible in tests.
 
 **Suggestion:** a counter or `gensym`.
 
-### U9 — Two overlapping key-matching APIs
+**Resolved:** a counter in `charm.components.id`. Worth noting the collision was
+not cosmetic - the spinner and timer compare ids to route their own tick
+messages, so a collision made two of them drive each other.
+
+### U9 — Two overlapping key-matching APIs — **done**
 
 `msg/key-match?` and `keys/key-matches?`, with different pattern semantics
 operating on different data shapes (message vs. event map).
 
 **Suggestion:** collapse to one; keep `msg/key-match?` as the public entry point.
 
-### U10 — `style` returns all 17 keys defaulted
+**Resolved:** `keys/key-matches?` deleted. It had no callers outside its own
+tests, and its pattern branch was the same modifier logic as `msg/key-match?`'s.
+
+### U10 — `style` returns all 17 keys defaulted — **done**
 
 So `merge`ing a variant onto a base overwrites with `nil` / `false` instead of
 inheriting. There is no `merge-style` / `inherit`, which is the first thing
@@ -661,6 +676,11 @@ anyone building a theme reaches for.
 
 **Suggestion:** add `merge-style` that ignores unset keys, or stop defaulting
 every key in the constructor.
+
+**Resolved:** `merge-style` takes named options rather than a second style map,
+which sidesteps the question of which keys were 'unset' - `(merge-style s :bold
+false)` genuinely turns bold off. The constructor still defaults every key;
+nothing needed to change there.
 
 ### U11 — Nothing auto-sizes to the terminal
 
@@ -1011,7 +1031,14 @@ Premise 1 under J1 (true color) and retiring the dynamic vars are unaffected by
 that rejection — both are about the renderer holding the terminal at emission
 time, not about the representation.
 
-**Phase 5 — JLine adoption + API ergonomics**
-J3 (ScreenTerminal tests — can also be pulled earlier, it's independent),
-J2 spike, J4, J5. U7, U8, U9, U10, U11, U12 (U12 with U9, since both are about
-key matching).
+**Phase 5 — JLine adoption + API ergonomics** — **ergonomics done**
+U7, U8, U9, U10 and U12 landed together: `:overflow`, an id counter,
+`merge-style`, one key matcher instead of two, and a bare key name no longer
+matching a modified key. 180 tests / 1269 assertions passing, up from
+176 / 1229.
+
+Still open: U11 (auto-sizing, which is an API design question rather than a fix),
+and the JLine items — J3 (ScreenTerminal-based integration tests), the J2
+`KeyParser` spike, J4 (`trackMouse`), J5 (terminal graphics). J4's enum is not
+exposed to babashka's SCI, though `getEnumConstants` reaches it, so that one needs
+the same care as J6 did.
