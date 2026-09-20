@@ -19,7 +19,7 @@ line-width (w/string-width line)   ; → fromAnsi, per line, per layer
 (str (styled-spaces left-pad bg) line (styled-spaces right-pad-count bg))
 ```
 
-Measured (P5):
+Measured:
 
 | operation | cost |
 |---|---|
@@ -59,8 +59,8 @@ frames below anything holding the state:
 Because `style/render` returns a finished `String`, the "is this terminal
 true-color? is the background dark?" decision is made down there, in a function
 whose signature is `(style & strings)`. Hence `*color-profile*` and
-`*dark-background?*` (ADR-less, added in Phase 0/J1). They are thread-local, and
-`init` runs before `run` binds them.
+`*dark-background?*`, which arrived with adaptive colors and never got an ADR of
+their own. They are thread-local, and `init` runs before `run` binds them.
 
 **3. True color has never reached the terminal.** `AttributedString.toAnsi()`
 without a terminal argument collapses 24-bit color to the 256 palette, so
@@ -139,16 +139,16 @@ keep compiling and quietly lose its colors. Neither is necessary.
 - Retires both dynamic vars, and with them the thread-locality caveat and the
   `init`-runs-before-`binding` hole
 - Lands true color for free, at the same boundary
-- `view` output becomes inspectable and diffable data: P3's skip-render can
-  compare structure instead of strings, and tests can assert on spans instead of
-  escape sequences
+- `view` output becomes inspectable and diffable data: the event loop's
+  skip-render can compare structure instead of strings, and tests can assert on
+  spans instead of escape sequences
 - Existing tests keep passing — they assert on `style/render`'s ANSI output,
   which is preserved
 
 ### Cons
 
-- Largest change in the plan: nine component namespaces (24 `style/render` call
-  sites) plus the whole of `layout`, `border` and `overlay`
+- Touches nine component namespaces (24 `style/render` call sites) plus the
+  whole of `layout`, `border` and `overlay`
 - Two representations coexist during migration, and `render!` must accept both
 - Blocks are verbose to print when debugging
 - `truncate` / `strip-ansi` need span-aware equivalents
@@ -157,7 +157,7 @@ keep compiling and quietly lose its colors. Neither is necessary.
 
 ## Alternatives considered
 
-**`AttributedString` as the currency** — what P5 originally suggested. Same
+**`AttributedString` as the currency** — the obvious first instinct. Same
 layout-stack rewrite, same perf win, less new code, and JLine's own type. But
 `AttributedStyle` holds concrete color indices built at construction time, so
 adaptive resolution still happens deep in the stack: `*dark-background?*` would
@@ -172,9 +172,9 @@ delivers less.
 
 Sequencing — each step is independently shippable:
 
-1. **P4** — parse each line once in `render!`, truncate via `.columnLength` /
-   `.columnSubSequence`. ~27% (140 µs → 102 µs), internal, no API surface.
-   Independent of everything below.
+1. Parse each line once in `render!`, truncating via `.columnLength` /
+   `.columnSubSequence` rather than re-parsing the truncated string. ~27%
+   (140 µs → 102 µs), internal, no API surface. Independent of everything below.
 2. Introduce the block representation and the emission boundary
    (`block->attributed-string`) alongside the current path. No public change.
 3. Rewrite `layout` / `border` / `overlay` on blocks; `style/render` becomes
@@ -226,5 +226,6 @@ this ADR is implemented: on an 8-color terminal charm's `\e[91m` now reaches the
 terminal as `\e[31m`. That is a second reason the two downgrades should collapse
 into one.
 
-Step 5 is where PLAN.md's premise 1 gets resolved. Until then the dynamic vars
-stay as the interim mechanism, as recorded in J1.
+Step 5 is where fact 3 above gets resolved — the point at which true color
+actually reaches the terminal. Until then the dynamic vars stay as the interim
+mechanism.
