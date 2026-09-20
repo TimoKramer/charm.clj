@@ -67,12 +67,17 @@ and an event loop that no longer caps input at about 100 messages a second.
   ceiling, and a burst of messages costs one frame rather than one per message.
   The frame a program quits on is still drawn, so an inline program's last view
   is not lost.
-- **Command bodies run on `a/thread`, not in a `go` block.** A command is where a
-  program does its blocking work, which is exactly what a `go` block must not do;
-  on the eight-thread dispatch pool a handful of concurrent commands starved it
-  and froze the UI. Verified: twenty commands sleeping 100 ms each now finish in
-  ~100 ms rather than ~300. The color environment still reaches command bodies,
-  since `a/thread` conveys the binding frame too.
+- **Command bodies run on virtual threads** (`a/io-thread`), not in a `go` block.
+  A command is where a program does its blocking work, which is exactly what a
+  `go` block must not do; on the eight-thread dispatch pool a handful of
+  concurrent commands starved it and froze the UI. Twenty commands sleeping
+  100 ms each now finish in ~100 ms rather than ~300, and 2000 concurrent
+  commands cost no extra platform threads where a thread pool would have created
+  2000 of them. Commands remain the place for blocking I/O rather than for
+  extended computation, which now holds a carrier thread. The color environment
+  still reaches command bodies, since `io-thread` conveys the binding frame too.
+  Where the runtime has no virtual threads - babashka's native image - it falls
+  back to ordinary ones.
 - **`strip-ansi` strips.** It returned `AttributedString/fromAnsi`'s rendering,
   which leaves a private `CSI` visible as text - `ESC[?1049h` came out as
   `1049h` - and keeps carriage returns, BEL and backspace. It is now

@@ -96,27 +96,40 @@
 (defn- execute-cmd!
   "Execute a command and send the resulting message to the channel.
 
-   Command bodies run on `a/thread`, not in a `go` block. A command is arbitrary
-   user code and is usually the place where a program does its blocking work -
-   sleeping, reading a file, calling an HTTP API - which is exactly what a `go`
-   block must not do. On the eight-thread dispatch pool a handful of concurrent
-   commands would starve it and freeze the UI. `a/thread` also conveys the
-   thread's binding frame, so the color environment still reaches a command that
-   renders styled text."
+   Command bodies run on `a/io-thread`, which is a virtual thread where the
+   runtime has them. Two reasons, in order of how much they matter:
+
+   Not a `go` block, because a command is arbitrary user code and is usually
+   where a program does its blocking work - sleeping, reading a file, calling an
+   HTTP API - which is exactly what a `go` block must not do. A handful of
+   concurrent commands would starve the dispatch pool and freeze the UI.
+
+   Not `a/thread`, because that pool is a cached pool of platform threads: a
+   burst of commands creates one OS thread each and parks them. Measured at 2000
+   concurrent commands, `a/thread` added 2000 platform threads while
+   `a/io-thread` added none.
+
+   The trade-off is that a command doing extended *computation* rather than I/O
+   now occupies a carrier thread for the duration, where a platform thread would
+   have been time-sliced. Commands are for I/O; heavy computation belongs on a
+   thread the application owns.
+
+   `a/io-thread` conveys the thread's binding frame just as `a/thread` did, so
+   the color environment still reaches a command that renders styled text."
   [cmd msg-chan]
   (when cmd
     (case (:type cmd)
       :cmd
-      (a/thread (run-cmd-fn! (:fn cmd) msg-chan))
+      (a/io-thread (run-cmd-fn! (:fn cmd) msg-chan))
 
       :batch
       (doseq [c (:cmds cmd)]
         (execute-cmd! c msg-chan))
 
       :sequence
-      (a/thread
-        (doseq [c (:cmds cmd)]
-          (run-cmd-fn! (:fn c) msg-chan)))
+      (a/io-thread
+       (doseq [c (:cmds cmd)]
+         (run-cmd-fn! (:fn c) msg-chan)))
 
       nil)))
 

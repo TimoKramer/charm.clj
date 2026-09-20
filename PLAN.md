@@ -164,17 +164,51 @@ concurrent sleeping or IO-bound commands starves the pool and freezes the UI.
 
 **Suggestion:** use `a/thread` for `:cmd` and `:sequence` bodies.
 
-**Resolved.** Both now run on `a/thread`, with the per-command body shared by a
+**Resolved**, and then taken one step further to `a/io-thread`, which is a
+virtual thread where the runtime has them. The per-command body is shared by a
 `run-cmd-fn!` helper rather than written twice.
 
 Verified: twenty commands sleeping 100 ms each finish in ~100 ms rather than the
-~300 ms that eight dispatch threads would force. Also verified that `a/thread`
-conveys the thread binding frame, so `*color-profile*` and `*dark-background?*`
-still reach a command that renders styled text — `go` did that too, and losing it
-would have been a silent regression until Phase 4 retires those vars.
+~300 ms that eight dispatch threads would force. Also verified that both
+`a/thread` and `a/io-thread` convey the thread binding frame, so
+`*color-profile*` and `*dark-background?*` still reach a command that renders
+styled text — `go` did that too, and losing it would have been a silent
+regression until Phase 4 retires those vars.
 
 `download.clj`'s `Thread/sleep` inside a `:cmd` is now the right pattern rather
 than the wrong one, so the documented example needed no change.
+
+**Why `io-thread` rather than `thread`:** `a/thread`'s pool is a cached pool of
+platform threads, so a burst of commands creates one OS thread each and parks
+them for a minute.
+
+| concurrent commands | `a/thread` | `a/io-thread` |
+|---|---|---|
+| 50 | +50 platform threads, 110 ms | +0, 119 ms |
+| 500 | +500, 167 ms | +0, 111 ms |
+| 2000 | +2000, 188 ms | +0, 146 ms |
+
+The trade-off is that a command doing extended *computation* now holds a carrier
+thread for the duration where a platform thread would have been time-sliced.
+Commands are for I/O; if a compute-heavy command ever needs its own pool,
+`a/thread-call` takes a `:compute` workload.
+
+`a/io-thread` exists in babashka's bundled core.async too, and falls back to
+ordinary threads there, since a native image has no virtual threads — so the
+platform-thread test is guarded on the runtime actually providing them.
+
+**Why not virtual threads anywhere else.** The other three threads charm creates
+are all single, long-lived ones, where virtual threads buy nothing:
+
+- the **input thread** blocks in a JLine read, which goes through FFM downcalls;
+  a native call pins its carrier, so a virtual thread would hold one of the few
+  carriers permanently for no scalability gain (JDK 24's JEP 491 fixed
+  `synchronized` pinning, not native-call pinning)
+- the **shutdown hook** runs once
+- **`run-async`'s program thread** is one thread running the whole event loop
+
+So "we are on a modern JVM, use virtual threads" applies to commands and to
+nothing else here.
 
 ### P7 — Full-vector copies per frame — **done**
 

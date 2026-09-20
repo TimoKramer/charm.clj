@@ -163,10 +163,15 @@ Create a command from a function that returns a message.
                {:type :timer-done}))
 ```
 
-Command bodies run on their own threads, so blocking in one - sleeping, reading a
-file, calling an HTTP API - is expected and will not hold up the event loop or
-any other command. Returning `nil` sends no message, and a command that throws
-becomes an [error message](messages.md#quit-and-error-messages).
+Command bodies run on their own virtual threads, so blocking in one - sleeping,
+reading a file, calling an HTTP API - is expected and will not hold up the event
+loop or any other command, however many are in flight. Returning `nil` sends no
+message, and a command that throws becomes an
+[error message](messages.md#quit-and-error-messages).
+
+Commands are for I/O. A command that does heavy computation rather than blocking
+occupies a carrier thread while it runs, so that work belongs on a thread the
+application manages itself.
 
 ### batch
 

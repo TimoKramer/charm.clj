@@ -344,3 +344,25 @@
 
     (testing "it gives up before the backoff would grow unbounded"
       (is (< @#'p/max-input-failures 20)))))
+
+(deftest command-thread-test
+  (let [execute-cmd! #'p/execute-cmd!
+        ;; babashka's native image has no virtual threads and io-thread falls
+        ;; back to ordinary ones there, so the claim below only holds where the
+        ;; runtime actually provides them
+        virtual? (a/<!! (a/io-thread (.isVirtual (Thread/currentThread))))]
+    (when virtual?
+      (testing "a burst of commands does not cost one platform thread each"
+        ;; Thread/activeCount counts the main thread group, which virtual threads
+        ;; are not part of - so it counts exactly what we do not want to grow
+        (let [n 200
+              ch (a/chan (inc n))
+              before (Thread/activeCount)]
+          (dotimes [_ n]
+            (execute-cmd! (p/cmd (fn [] (Thread/sleep 300) (msg/key-press "x"))) ch))
+          ;; Sampled while all of them are still sleeping
+          (Thread/sleep 100)
+          (let [growth (- (Thread/activeCount) before)]
+            (dotimes [_ n] (first (a/alts!! [ch (a/timeout 5000)])))
+            (is (< growth (quot n 4))
+                (str n " concurrent commands added " growth " platform threads"))))))))
