@@ -25,4 +25,5 @@
    ["ADR 005: Layout Primitives" {:file "doc/adr/005-layout-primitives.md"}]
    ["ADR 006: Remove charm.core Facade" {:file "doc/adr/006-remove-charm-core-facade.md"}]
    ["ADR 007: Grapheme Cluster Width" {:file "doc/adr/007-grapheme-cluster-width.md"}]
+   ["ADR 008: Styling Currency" {:file "doc/adr/008-styling-currency.md"}]
    ["ADR 009: Frame Pacing and Command Scheduling" {:file "doc/adr/009-frame-pacing-and-command-scheduling.md"}]]]}
