@@ -25,9 +25,9 @@ location, and a concrete suggestion.
    left, and is now fixed, is `ESC c` resetting the terminal, CR hiding content,
    private CSI arriving as visible text, and the window title. See S1 for the
    measurements.
-3. **Rewrite the event loop** to block on the channel, drain, and render once per
-   frame — fixes the 100 msg/s ceiling and makes `:fps` real in a single change.
-   (P1, P2, P3)
+3. ~~**Rewrite the event loop** to block on the channel, drain, and render once per
+   frame~~ — **done** (P1, P2, P3). 300 messages went from 3 s to 3 ms, and
+   `:fps` is now the redraw ceiling it was documented to be.
 4. ~~**Fix `:fg 240`, `:strikethrough` and `"pgup"`**~~ — **done** (U1, U2, U3).
    Three small bugs that made documented features, the library's own default
    styling, and Page Up/Down silently do nothing. U3 turned out to cover `"esc"`
@@ -37,7 +37,7 @@ location, and a concrete suggestion.
 
 ## 1. Performance
 
-### P1 — Event loop caps the library at ~100 messages/second
+### P1 — Event loop caps the library at ~100 messages/second — **done**
 
 `src/charm/program.clj:242`
 
@@ -55,7 +55,24 @@ pending.
 **Suggestion:** block on `a/alts!!` over `msg-chan` (plus a frame-tick channel),
 then drain everything available before rendering.
 
-### P2 — `:fps` does nothing
+**Resolved**, as suggested, with one deviation: there is no separate frame-tick
+channel. `alts!!` waits on `msg-chan` against a timeout sized to the remaining
+time in the current frame, which doubles as the poll that notices an externally
+flipped `running?` — `run-async`'s `:quit!` only sets that atom, so a purely
+blocking take would not see it.
+
+Measured on `run-event-loop!` alone, at 60 fps:
+
+| messages | before | after |
+|---|---|---|
+| 300 | ~3000 ms | 3.0 ms |
+| 1000 | ~10 s | 5.5 ms |
+| 5000 | ~50 s | 7.3 ms |
+
+End to end through `run`, a 300-character burst plus terminal setup and teardown
+is 161 ms.
+
+### P2 — `:fps` does nothing — **done**
 
 Documented in the README and in `run`'s docstring, stored at
 `src/charm/render/core.clj:29`, never read anywhere. There is no frame
@@ -64,6 +81,23 @@ coalescing: every single message triggers a full `view` + `render!`.
 **Suggestion:** fold into P1 — drain all pending messages → run `update` for each
 → render once per frame tick. One change fixes both the input ceiling and the
 render amplification.
+
+**Resolved** as suggested. `handle-msg!` no longer renders; it returns whether
+the frame is dirty, and the loop owns the render.
+
+Two things the benchmark caught that the plan did not anticipate:
+
+1. **The frame a program quits on was being dropped.** Rendering only on the
+   frame tick means a state change and the quit that follows it can land in the
+   same batch, and the loop then exits with the render still owed. The old
+   per-message render always drew it. For an alt-screen program it does not
+   matter — cleanup wipes the screen — but an inline program's last view is what
+   stays on the terminal, so "Done!" would never appear. The loop now draws a
+   frame it still owes on its way out.
+2. **A dirty frame must not be forgotten by a later clean batch.** `dirty?` has
+   to be `or`-ed across iterations, not replaced: a state change followed, inside
+   the same frame, by messages that change nothing would otherwise lose its
+   render entirely. Both are covered by tests.
 
 ### P3 — No skip-render on unchanged state — **done**
 
@@ -119,7 +153,7 @@ in charm's own examples. Same rewrite either way; the data version additionally
 retires both dynamic vars and lands true color at the same boundary. The ADR
 carries the sequencing.
 
-### P6 — Blocking work runs on core.async's dispatch pool
+### P6 — Blocking work runs on core.async's dispatch pool — **done**
 
 `src/charm/program.clj:73-90`. `:cmd` and `:sequence` invoke user functions
 inside `go` blocks. `go` blocks must not block; the pool is 8 threads.
@@ -129,6 +163,18 @@ inside `go` blocks. `go` blocks must not block; the pool is 8 threads.
 concurrent sleeping or IO-bound commands starves the pool and freezes the UI.
 
 **Suggestion:** use `a/thread` for `:cmd` and `:sequence` bodies.
+
+**Resolved.** Both now run on `a/thread`, with the per-command body shared by a
+`run-cmd-fn!` helper rather than written twice.
+
+Verified: twenty commands sleeping 100 ms each finish in ~100 ms rather than the
+~300 ms that eight dispatch threads would force. Also verified that `a/thread`
+conveys the thread binding frame, so `*color-profile*` and `*dark-background?*`
+still reach a command that renders styled text — `go` did that too, and losing it
+would have been a silent regression until Phase 4 retires those vars.
+
+`download.clj`'s `Thread/sleep` inside a `:cmd` is now the right pattern rather
+than the wrong one, so the documented example needed no change.
 
 ### P7 — Full-vector copies per frame — **done**
 
@@ -142,7 +188,7 @@ log is O(total lines) per frame instead of O(visible).
 **Resolved:** dropped in both places. `:lines` comes from `split-content` and
 the renderer's from `content->lines`; both are already vectors.
 
-### P8 — Input thread can busy-spin
+### P8 — Input thread can busy-spin — **done**
 
 `src/charm/program.clj:143-146` catches and discards every exception inside
 `(while @running? …)` with no backoff. A persistently failing reader pins a core
@@ -150,6 +196,16 @@ at 100%.
 
 **Suggestion:** count consecutive failures, back off, and bail out after a
 threshold.
+
+**Resolved:** exponential backoff from 2 ms, capped at 500 ms, and after ten
+consecutive failures the thread sends an `:error` message and stops, so the
+program fails visibly instead of looping. A successful read resets the count,
+which keeps the expected single failures during shutdown harmless.
+
+The event-to-message conversion came out of the loop into `event->msg` while
+here — it was a 40-line `cond` nested five levels deep inside the thread body,
+and the backoff needed another level. It is now unit-testable, which is how the
+`nil`-versus-`false` modifier wart surfaced.
 
 ### P9 — Reflection on hot paths — **done**
 
@@ -468,7 +524,7 @@ missing name.
 names none, and check the repo's own bindings for anything that was relying on
 the loose match.
 
-### U5 — Bracketed paste is built but never wired up
+### U5 — Bracketed paste is built but never wired up — **done**
 
 `src/charm/render/core.clj:146-154` has the enable/disable calls and
 `src/charm/input/keymap.clj:79-80` binds `:paste-start` / `:paste-end` — but
@@ -479,13 +535,40 @@ from typed input.
 **Suggestion:** add a `:bracketed-paste` option, enable it in `start!`, and
 coalesce everything between the markers into a single paste message.
 
-### U6 — Ctrl+C is intercepted and turned into a key message
+**Resolved** as suggested, plus `msg/paste` / `msg/paste?`, and `stop!` disables
+it again. Default `false`: turning it on changes what an application receives, and
+one that only handles key presses would stop seeing pastes altogether.
+
+Inside a paste, Enter and Tab are appended as text rather than delivered as key
+presses, and an event that cannot be part of the text is dropped without ending
+the paste early.
+
+**A bound was needed that the suggestion did not mention.** Waiting for the end
+marker with no limit means a truncated paste sequence keeps the input thread in
+that loop forever, and the application stops seeing input at all — a freeze, not
+a slow path. Found by an integration test for the unterminated case hanging the
+suite. Three consecutive read timeouts (~300 ms of silence) now end the paste; a
+paste arrives as one contiguous burst, so silence means the terminal is not going
+to finish it.
+
+### U6 — Ctrl+C is intercepted and turned into a key message — **done**
 
 `src/charm/program.clj:233`. If the app's `update` doesn't handle `"ctrl+c"`, the
 program cannot be killed from the keyboard.
 
 **Suggestion:** make it an option, default to quitting unless the app opts in,
 and document it prominently either way.
+
+**Resolved:** `:ctrl-c` is `:quit` by default, which stops the program before
+`update` sees the key, or `:message`, which delivers it as an ordinary
+`"ctrl+c"` key press and leaves quitting to the application. Documented in
+`doc/api/program.md` under its own heading and in the README's option list.
+
+Verified against a program whose `update` handles nothing at all: it now exits on
+Ctrl+C, where before it could not be killed from the keyboard. Every one of the
+fourteen examples in this repository uses `"ctrl+c"` only to quit, so the new
+default is behaviour-preserving for all of them and their bindings simply became
+redundant.
 
 ### U7 — Overflowing views are truncated from the top
 
@@ -839,8 +922,15 @@ up under their items.
 **Still open from this phase:** gating the release job on a tag instead of every
 push to `main` (S7), which changes how releases are cut.
 
-**Phase 3 — event loop**
-P1 + P2 as one change, then P6, P8. U5 and U6 land naturally on top.
+**Phase 3 — event loop** — **done**
+P1 + P2 as one change, then P6, P8, U5, U6. 175 tests / 1217 assertions passing,
+up from 169 / 1159.
+
+Two hazards that only showed up once the loop stopped rendering per message:
+the frame a program quits on was dropped, and a dirty frame could be forgotten by
+a later clean batch. Both under P2. U5 needed a timeout bound that the item did
+not mention, or an unterminated paste freezes the input thread — found by a test
+hanging.
 
 **Phase 4 — rendering architecture**
 P4, then P5 (one representation through the layout stack — spans as data, see

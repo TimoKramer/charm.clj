@@ -11,11 +11,20 @@ Versions are `MAJOR.MINOR.<commit count>` — the last number comes from
 
 Light/dark adaptive styling, colors written as plain values now actually apply,
 a round of correctness fixes to documented features that silently did nothing,
-and content a program did not author no longer reaches the terminal as
-instructions.
+content a program did not author no longer reaches the terminal as instructions,
+and an event loop that no longer caps input at about 100 messages a second.
 
 ### Added
 
+- **`:bracketed-paste` option on `run`** (default `false`). With it on, a paste
+  arrives as a single `:paste` message carrying the whole text, instead of one
+  key press per character that an application cannot tell apart from fast
+  typing. `msg/paste` and `msg/paste?` come with it. Off by default, because a
+  program that handles only key presses would otherwise stop seeing pastes.
+- **`:ctrl-c` option on `run`** (default `:quit`). Ctrl+C now stops the program
+  before `update` sees it, so a program that does not handle it can still be
+  killed from the keyboard. Pass `:message` to take it over - to confirm before
+  quitting, say - and quitting becomes the application's job.
 - **`charm.ansi.sanitize`.** `sanitize` keeps SGR styling and drops every other
   escape sequence, plus every control character but newline and tab; `strip`
   drops the styling too, leaving the text a terminal would display;
@@ -47,6 +56,23 @@ instructions.
 
 ### Changed
 
+- **The event loop blocks for messages instead of polling, and renders once a
+  frame.** It used to sleep 10 ms every iteration and then handle exactly one
+  message, so every keystroke waited up to 10 ms and throughput was capped near
+  100 messages a second: a 300-character paste took three seconds. It now waits
+  on the channel, handles everything queued, and renders at most once per
+  `:fps`. Measured on the loop alone: 300 messages in 3 ms, 5000 in 7 ms.
+- **`:fps` does something.** It was documented, stored and never read - every
+  single message triggered a full `view` and terminal diff. It is now the redraw
+  ceiling, and a burst of messages costs one frame rather than one per message.
+  The frame a program quits on is still drawn, so an inline program's last view
+  is not lost.
+- **Command bodies run on `a/thread`, not in a `go` block.** A command is where a
+  program does its blocking work, which is exactly what a `go` block must not do;
+  on the eight-thread dispatch pool a handful of concurrent commands starved it
+  and froze the UI. Verified: twenty commands sleeping 100 ms each now finish in
+  ~100 ms rather than ~300. The color environment still reaches command bodies,
+  since `a/thread` conveys the binding frame too.
 - **`strip-ansi` strips.** It returned `AttributedString/fromAnsi`'s rendering,
   which leaves a private `CSI` visible as text - `ESC[?1049h` came out as
   `1049h` - and keeps carriage returns, BEL and backspace. It is now
@@ -133,6 +159,13 @@ instructions.
 
 ### Fixed
 
+- **A failing terminal reader no longer spins a core.** Every exception in the
+  input thread was caught and discarded with no backoff. It now backs off
+  exponentially, and after ten consecutive failures reports an error and stops
+  instead of looping forever.
+- **Modifiers on messages built from terminal events are booleans**, not `nil`.
+  `key-press` documents them as `false`, and that is what they now are however
+  the message was built.
 - **`"esc"`, `"pgup"` and `"pgdown"` never matched anything.** Key events carry
   `:escape`, `:page-up` and `:page-down`, so `key-match?` compared against
   `"escape"` and friends. Page Up and Page Down were dead in `list`, `table`,
