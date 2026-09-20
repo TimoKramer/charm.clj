@@ -14,7 +14,7 @@
    [charm.render.core :as render]
    [charm.style.color :as color]
    [charm.terminal :as term]
-   [clojure.core.async :as a :refer [>! chan close! go]])
+   [clojure.core.async :as a :refer [chan close!]])
   (:import
    [org.jline.terminal Terminal Attributes]))
 
@@ -82,46 +82,162 @@
 ;; Event Loop
 ;; ---------------------------------------------------------------------------
 
+(defn- run-cmd-fn!
+  "Call one command function and send what it returns to the channel."
+  [f msg-chan]
+  (try
+    (when-let [result (f)]
+      (a/>!! msg-chan result))
+    (catch Exception e
+      (a/>!! msg-chan (msg/error e)))))
+
 (defn- execute-cmd!
-  "Execute a command and send the resulting message to the channel."
+  "Execute a command and send the resulting message to the channel.
+
+   Command bodies run on `a/thread`, not in a `go` block. A command is arbitrary
+   user code and is usually the place where a program does its blocking work -
+   sleeping, reading a file, calling an HTTP API - which is exactly what a `go`
+   block must not do. On the eight-thread dispatch pool a handful of concurrent
+   commands would starve it and freeze the UI. `a/thread` also conveys the
+   thread's binding frame, so the color environment still reaches a command that
+   renders styled text."
   [cmd msg-chan]
   (when cmd
     (case (:type cmd)
       :cmd
-      (go
-        (try
-          (when-let [result ((:fn cmd))]
-            (>! msg-chan result))
-          (catch Exception e
-            (>! msg-chan (msg/error e)))))
+      (a/thread (run-cmd-fn! (:fn cmd) msg-chan))
 
       :batch
       (doseq [c (:cmds cmd)]
         (execute-cmd! c msg-chan))
 
       :sequence
-      (go
+      (a/thread
         (doseq [c (:cmds cmd)]
-          (try
-            (when-let [result ((:fn c))]
-              (>! msg-chan result))
-            (catch Exception e
-              (>! msg-chan (msg/error e))))))
+          (run-cmd-fn! (:fn c) msg-chan)))
 
       nil)))
 
 (defn- handle-msg!
-  "Run `update` for one message, execute its command and render the new view.
+  "Run `update` for one message and execute the command it returns.
 
-   Skips the render when `update` returned the identical state, since the
-   frame cannot have changed."
-  [renderer update view state msg-chan m & {:keys [force-render?]}]
-  (let [old-state @state
-        [new-state cmd] (update old-state m)]
-    (reset! state new-state)
-    (execute-cmd! cmd msg-chan)
-    (when (or force-render? (not (identical? new-state old-state)))
-      (render/render! renderer (view new-state)))))
+   Returns true when the frame needs redrawing: either the state changed, or the
+   message was a resize, where the frame changed even if the application ignored
+   it. Rendering itself belongs to the frame tick, not here.
+
+   A quit message stops the loop, and an error stops it and is rethrown so it
+   surfaces on the caller's thread."
+  [{:keys [renderer update state msg-chan running?]} m]
+  (cond
+    (msg/quit? m)
+    (do (reset! running? false) false)
+
+    (msg/error? m)
+    (do (reset! running? false)
+        (throw (:error m)))
+
+    :else
+    (let [resize? (msg/window-size? m)]
+      (when resize?
+        (render/update-size! renderer (:width m) (:height m)))
+      (let [old-state @state
+            [new-state cmd] (update old-state m)]
+        (reset! state new-state)
+        (execute-cmd! cmd msg-chan)
+        (or resize? (not (identical? new-state old-state)))))))
+
+(defn- drain!
+  "Handle `m` and every message already queued behind it.
+
+   Returns true if any of them dirtied the frame. Stops early once the loop is
+   no longer running, so nothing is processed after a quit."
+  [{:keys [msg-chan running?] :as ctx} m]
+  (loop [m m
+         dirty? false]
+    (if (nil? m)
+      dirty?
+      (let [dirty? (or (handle-msg! ctx m) dirty?)]
+        (if @running?
+          (recur (a/poll! msg-chan) dirty?)
+          dirty?)))))
+
+(defn- run-event-loop!
+  "Block for messages, drain everything queued, and render at most once a frame.
+
+   Waiting rather than sleeping is what lifts the input ceiling: every message
+   used to wait up to 10 ms and only one was handled per tick, so a
+   300-character paste took three seconds. Rendering on the frame tick rather
+   than per message is what makes `:fps` mean anything - a burst of messages now
+   costs one `view` and one diff instead of one each."
+  [{:keys [renderer view state msg-chan running? fps] :as ctx}]
+  (let [frame-ns (quot 1000000000 (long (max 1 fps)))]
+    (loop [dirty? false
+           last-render (System/nanoTime)]
+      (if-not @running?
+        ;; Draw the frame still owed on the way out: a program that quits on the
+        ;; same key that changed its state would otherwise never show its last
+        ;; view, which for an inline program is the one left on screen.
+        (when dirty?
+          (render/render! renderer (view @state)))
+        (let [now (System/nanoTime)]
+          (if (and dirty? (>= (- now last-render) frame-ns))
+            (do (render/render! renderer (view @state))
+                (recur false now))
+            ;; Wait for work, but never past the frame deadline, so a pending
+            ;; render and an externally flipped `running?` are both noticed.
+            (let [wait-ns (if dirty? (- frame-ns (- now last-render)) frame-ns)
+                  wait-ms (max 1 (quot wait-ns 1000000))
+                  [m _] (a/alts!! [msg-chan (a/timeout wait-ms)])]
+              ;; `or`, not `=`: a frame already owed must not be forgotten
+              ;; because the next batch of messages changed nothing.
+              (recur (or (drain! ctx m) dirty?) last-render))))))))
+
+(def ^:private wheel-buttons
+  "Mouse button codes the terminal reports for wheel movement."
+  {4 :wheel-up 5 :wheel-down 6 :wheel-left 7 :wheel-right})
+
+(def ^:private mouse-buttons
+  {0 :left 1 :middle 2 :right})
+
+(defn- event->msg
+  "Convert one input event into a message."
+  [event]
+  (case (:type event)
+    :mouse
+    (let [button (int (:button event))
+          wheel (get wheel-buttons button)]
+      (msg/mouse (or wheel (:action event))
+                 (if wheel :none (get mouse-buttons button :none))
+                 (:x event) (:y event)
+                 :ctrl (boolean (:ctrl event))
+                 :alt (boolean (:alt event))
+                 :shift (boolean (:shift event))))
+
+    :focus (msg/focus)
+    :blur (msg/blur)
+
+    ;; A :runes event carries the characters typed; everything else is named by
+    ;; its type, which is the key name.
+    ;; `boolean`, because an event map simply omits the modifiers it does not
+    ;; carry, and key-press documents them as false rather than nil
+    (msg/key-press (if (= :runes (:type event))
+                     (:runes event)
+                     (:type event))
+                   :ctrl (boolean (:ctrl event))
+                   :alt (boolean (:alt event))
+                   :shift (boolean (:shift event)))))
+
+(def ^:private max-input-failures
+  "Consecutive read failures tolerated before giving up on the terminal.
+
+   A reader that fails forever would otherwise spin this thread at 100% of a
+   core, since every exception was caught and discarded with no backoff."
+  10)
+
+(defn- input-backoff-ms
+  "Milliseconds to wait after `failures` consecutive read failures."
+  ^long [failures]
+  (min 500 (bit-shift-left 1 (min 9 (long failures)))))
 
 (defn- start-input-loop!
   "Start reading terminal input and sending to message channel.
@@ -129,54 +245,44 @@
   [^Terminal terminal msg-chan running?]
   (let [;; Create terminal-aware keymap for escape sequence lookup
         keymap (km/create-keymap terminal)
-        thread (Thread.
-                (fn []
-                  (while @running?
-                    (try
-                      (when-let [event (input/read-event terminal
-                                                         :timeout-ms 100
-                                                         :keymap keymap)]
-                        ;; Convert input event to message
-                        (let [m (cond
-                                  (= :mouse (:type event))
-                                  (let [raw-button (:button event)
-                                        wheel (case (int raw-button)
-                                                4 :wheel-up   5 :wheel-down
-                                                6 :wheel-left 7 :wheel-right
-                                                nil)]
-                                    (msg/mouse (if wheel wheel (:action event))
-                                               (if wheel
-                                                 :none
-                                                 (case (int raw-button)
-                                                   0 :left 1 :middle 2 :right
-                                                   :none))
-                                               (:x event) (:y event)
-                                               :ctrl (:ctrl event)
-                                               :alt (:alt event)
-                                               :shift (:shift event)))
+        thread
+        (Thread.
+         (fn []
+           (loop [failures 0]
+             (when @running?
+               (let [failure
+                     (try
+                       (when-let [event (input/read-event terminal
+                                                          :timeout-ms 100
+                                                          :keymap keymap)]
+                         (a/put! msg-chan (event->msg event)))
+                       nil
+                       (catch InterruptedException _
+                         (reset! running? false)
+                         nil)
+                       (catch Exception e
+                         ;; Expected while shutting down, when the reader is
+                         ;; closed under us; only a run of them is a problem.
+                         e))]
+                 (cond
+                   (not @running?) nil
 
-                                  (= :focus (:type event))
-                                  (msg/focus)
+                   failure
+                   (let [failures (inc failures)]
+                     (if (>= failures max-input-failures)
+                       (do
+                         (a/put! msg-chan
+                                 (msg/error
+                                  (ex-info (str "Terminal input failed "
+                                                failures " times in a row; giving up")
+                                           {:failures failures}
+                                           failure)))
+                         (reset! running? false))
+                       (do
+                         (Thread/sleep (input-backoff-ms failures))
+                         (recur failures))))
 
-                                  (= :blur (:type event))
-                                  (msg/blur)
-
-                                  :else
-                                  ;; For :runes type, use the runes as key; otherwise use type
-                                  (let [key (if (= :runes (:type event))
-                                              (:runes event)
-                                              (:type event))]
-                                    (msg/key-press key
-                                                   :ctrl (:ctrl event)
-                                                   :alt (:alt event)
-                                                   :shift (:shift event))))]
-                          (when m
-                            (a/put! msg-chan m))))
-                      (catch InterruptedException _
-                        (reset! running? false))
-                      (catch Exception _
-                        ;; Ignore read errors during shutdown
-                        nil)))))]
+                   :else (recur 0)))))))]
     (.setDaemon thread true)
     (.start thread)
     thread))
@@ -346,38 +452,13 @@
           (render/render! renderer (view @state))
 
           ;; Main event loop
-          (loop []
-            (when @running?
-              (when-let [_ (a/<!! (a/timeout 10))]
-                ;; Timeout - just continue
-                nil)
-
-              (when-let [m (a/poll! msg-chan)]
-                (cond
-                  ;; Quit message
-                  (msg/quit? m)
-                  (reset! running? false)
-
-                  ;; Error message
-                  (= :error (:type m))
-                  (do
-                    (reset! running? false)
-                    (throw (:error m)))
-
-                  ;; Window size
-                  (= :window-size (:type m))
-                  (do
-                    (render/update-size! renderer (:width m) (:height m))
-                    ;; The size changed, so the frame has to be redrawn even
-                    ;; if the app ignored the message.
-                    (handle-msg! renderer update view state msg-chan m :force-render? true))
-
-                  ;; Regular message
-                  :else
-                  (handle-msg! renderer update view state msg-chan m)))
-
-              (when @running?
-                (recur))))
+          (run-event-loop! {:renderer renderer
+                            :update update
+                            :view view
+                            :state state
+                            :msg-chan msg-chan
+                            :running? running?
+                            :fps fps})
 
           ;; Interrupt input thread
           (.interrupt input-thread))
