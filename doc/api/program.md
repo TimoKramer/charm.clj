@@ -62,6 +62,54 @@ decides which end goes:
 Neither scrolls. For content that should scroll, use the viewport component
 rather than letting the renderer trim.
 
+### Sizing a component to the terminal
+
+Components take a fixed `:height`, and `0` means unbounded. Nothing sizes itself,
+so a program that wants a component to fill the screen works out how much room is
+left and says so — on the `:window-size` message, which arrives once at startup and
+again on every resize.
+
+Measure the rest of the view rather than keeping the number by hand:
+
+```clojure
+(defn- header [state]
+  (str (style/render title-style "My App") "\n"
+       (style/render path-style (:path state)) "\n\n"))
+
+(defn- footer [state]
+  (str "\n" (help/short-help-view (:help state))))
+
+(defn- rows-in [s]
+  ;; newlines, not str/split-lines, which drops a trailing blank line
+  (count (re-seq #"\n" s)))
+
+(defn- body-height [state]
+  (- (:term-height state)
+     (rows-in (header state))
+     (rows-in (footer state))))
+
+(defn update-fn [state msg]
+  (cond
+    (msg/window-size? msg)
+    (let [state (assoc state :term-width (:width msg) :term-height (:height msg))]
+      [(assoc state :body (viewport/viewport-set-dimensions
+                           (:body state) (:width msg) (body-height state)))
+       nil])
+    ...))
+
+(defn view [state]
+  ;; the same header and footer that were measured, so the two cannot disagree
+  (str (header state) (viewport/viewport-view (:body state)) (footer state)))
+```
+
+The point is that `view` and the measurement share the same functions. A constant
+works until someone adds a line to the view, and then it is wrong with nothing to
+say so — `examples/file_browser.clj` carried `chrome-height 5` where its view used
+4, and quietly wasted a row on every terminal.
+
+If the view ends up taller than the terminal anyway, `:overflow` above decides
+which end survives.
+
 ### Ctrl+C
 
 By default Ctrl+C stops the program before `update` sees it, so a program that

@@ -36,9 +36,6 @@
 
 (def ^:private details-width 36)
 
-;; Header (title + path + blank line) + blank line before help + help line
-(def ^:private chrome-height 5)
-
 (defn format-size
   "Format file size in human-readable format."
   [bytes]
@@ -86,18 +83,46 @@
                     (format-size (:size info)))
      :data info}))
 
+(defn- header
+  "Everything the view puts above the two columns."
+  [state]
+  (str (style/render title-style "File Browser") "\n"
+       (style/render path-style (:current-path state)) "\n\n"))
+
+(defn- footer
+  "Everything the view puts below the two columns."
+  [state]
+  (str "\n" (help/short-help-view (:help state))))
+
+(defn- rows-in
+  "Rows a piece of the view occupies.
+
+   Counts newlines rather than calling str/split-lines, which drops the trailing
+   blank line the header deliberately ends with."
+  [s]
+  (count (re-seq #"\n" s)))
+
+(defn- chrome-height
+  "Rows spent on anything other than the two columns.
+
+   Measured from the strings the view actually renders, so the two cannot
+   disagree. As a hand-kept constant this was 5 where the view uses 4, which cost
+   a row of listing on every terminal."
+  [state]
+  (+ (rows-in (header state)) (rows-in (footer state))))
+
 (defn- list-width [term-width]
   (max 20 (- term-width details-width)))
 
 (defn- list-height
   "Number of list items visible. Each item takes 2 lines (title + description)."
-  [term-height]
-  (max 3 (quot (- term-height chrome-height) 2)))
+  [state]
+  (max 3 (quot (- (:term-height state) (chrome-height state)) 2)))
 
-(defn- make-file-list [items term-width term-height]
+(defn- make-file-list [state items]
   (item-list/item-list items
-                       :height (list-height term-height)
-                       :width (list-width term-width)
+                       :height (list-height state)
+                       :width (list-width (:term-width state))
                        :show-descriptions true
                        :cursor-style (style/style :fg style/cyan :bold true)))
 
@@ -105,26 +130,24 @@
   (let [start-path (System/getProperty "user.dir")
         files (list-directory start-path)
         items (mapv file->list-item files)]
-    [{:current-path start-path
-      :files files
-      :items items
-      :term-width 80
-      :term-height 24
-      :file-list (make-file-list items 80 24)
-      :help (help/help help-bindings :width 60)}
-     nil]))
+    ;; The list needs the chrome measured, which needs the rest of the state, so
+    ;; build that first and add the list to it.
+    (let [state {:current-path start-path
+                 :files files
+                 :items items
+                 :term-width 80
+                 :term-height 24
+                 :help (help/help help-bindings :width 60)}]
+      [(assoc state :file-list (make-file-list state items)) nil])))
 
 (defn navigate-to
   "Navigate to a directory."
   [state path]
   (let [files (list-directory path)]
     (if files
-      (let [items (mapv file->list-item files)]
-        (assoc state
-               :current-path path
-               :files files
-               :items items
-               :file-list (make-file-list items (:term-width state) (:term-height state))))
+      (let [items (mapv file->list-item files)
+            state (assoc state :current-path path :files files :items items)]
+        (assoc state :file-list (make-file-list state items)))
       state)))
 
 (defn go-up
@@ -154,12 +177,8 @@
 
     ;; Window resize
     (msg/window-size? msg)
-    (let [w (:width msg)
-          h (:height msg)]
-      [(assoc state
-              :term-width w
-              :term-height h
-              :file-list (make-file-list (:items state) w h))
+    (let [state (assoc state :term-width (:width msg) :term-height (:height msg))]
+      [(assoc state :file-list (make-file-list state (:items state)))
        nil])
 
     ;; Go up directory
@@ -217,16 +236,14 @@
                                    :border-fg 240
                                    :padding [0 1]
                                    :width (- details-width 2))
-        content-height (* (list-height (:term-height state)) 2)
+        content-height (* (list-height state) 2)
         left-w (list-width (:term-width state))]
-    (str (style/render title-style "File Browser") "\n"
-         (style/render path-style (:current-path state)) "\n\n"
+    (str (header state)
          (two-columns file-list-view
                       (style/render details-style details-view)
                       left-w
                       content-height)
-         "\n"
-         (help/short-help-view (:help state)))))
+         (footer state))))
 
 (defn -main [& _args]
   (program/run {:init init

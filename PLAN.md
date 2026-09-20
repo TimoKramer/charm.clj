@@ -682,7 +682,7 @@ which sidesteps the question of which keys were 'unset' - `(merge-style s :bold
 false)` genuinely turns bold off. The constructor still defaults every key;
 nothing needed to change there.
 
-### U11 — Nothing auto-sizes to the terminal
+### U11 — Nothing auto-sizes to the terminal — **done as documentation**
 
 Every component takes `:height 0` = unbounded, so each app hand-threads
 window-size arithmetic. `doc/examples/src/examples/file_browser.clj:85-93` spends
@@ -690,6 +690,29 @@ real code on `chrome-height` bookkeeping.
 
 **Suggestion:** a "fill remaining space" affordance would remove a lot of
 per-app boilerplate.
+
+**Resolved without new API, because there was no missing capability.** Two things
+the item conflates:
+
+*Resize already works.* `:window-size` arrives at startup and on every WINCH, the
+renderer resizes itself and the message reaches `update`, which rebuilds its
+components. Four examples already do this. Nothing was missing in the plumbing.
+
+*The remaining rows are already computable.* An application can measure the rest
+of its view — `(count (re-seq #"\n" header))` — and hand the remainder to the
+component. `file_browser` simply did not: it kept `chrome-height 5` where the view
+uses 4, which cost a row of listing on every terminal, and the comment above the
+constant counted a blank line the view never emitted.
+
+So: the example now derives it from the very `header` and `footer` functions the
+view renders, and `doc/api/program.md` documents the pattern. Measured before and
+after, view rows against terminal rows: 22/24 and 28/30 before, 24/24 and 30/30
+after. At an odd height it is still one short, because each list item is two rows.
+
+**What would justify real API**, and did not turn up here: a view whose chrome
+height depends on the body's height. That is circular, so no amount of measuring
+resolves it, and it is the case a layout container would exist for. Tracked as a
+GitHub issue rather than left here.
 
 ---
 
