@@ -39,6 +39,17 @@ Public is every namespace whose `ns` form does *not* carry `^:no-doc`:
 - Record every break in `CHANGELOG.md`, marked **Potentially breaking**, and write
   an ADR when the reasoning is worth keeping.
 
+# ADRs
+
+An ADR records a decision as it was made. Do not rewrite one so that it reads like
+what is true now.
+
+- Changing `Status` is part of the lifecycle: Proposed becomes Accepted, or
+  Rejected or Superseded when something overtakes it. Say what overtook it.
+- Anything learned after the decision goes in an appended, dated addendum, not
+  into the original Context or Decision.
+- A decision that replaces another gets its own ADR, and the old one points to it.
+
 # Code Style
 
 ## Keep it simple

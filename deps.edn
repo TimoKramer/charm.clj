@@ -5,9 +5,11 @@
                                              :exclusions [org.jline/jline-native]}
                org.jline/jline-reader {:mvn/version "4.4.5"}}
 
- :aliases {:test {:extra-paths ["test"]
+ :aliases {:test {:extra-paths ["test" "test-jvm"]
                   :extra-deps {io.github.cognitect-labs/test-runner {:git/tag "v0.5.1" :git/sha "dfb30dd"}}
-                  :main-opts ["-m" "cognitect.test-runner"]
+                  ;; test-jvm holds tests that cannot load under babashka, so
+                  ;; bb.edn deliberately does not list it
+                  :main-opts ["-m" "cognitect.test-runner" "-d" "test" "-d" "test-jvm"]
                   :jvm-opts ["--enable-native-access=ALL-UNNAMED"]}
 
            :repl {:extra-deps {nrepl/nrepl {:mvn/version "1.6.0"}
@@ -23,11 +25,11 @@
                    :ns-default build}
 
            :format {:extra-deps {dev.weavejester/cljfmt {:mvn/version "0.16.3"}}
-                    :main-opts ["-m" "cljfmt.main" "check" "src" "test"]}
+                    :main-opts ["-m" "cljfmt.main" "check" "src" "test" "test-jvm" "dev"]}
 
            :reflection {:extra-paths ["dev"]
                         :main-opts ["-m" "reflection"]
                         :jvm-opts ["--enable-native-access=ALL-UNNAMED"]}
 
            :lint {:extra-deps {clj-kondo/clj-kondo {:mvn/version "2026.01.19"}}
-                  :main-opts ["-m" "clj-kondo.main" "--fail-level" "error" "--lint" "src" "test"]}}}
+                  :main-opts ["-m" "clj-kondo.main" "--fail-level" "error" "--lint" "src" "test" "test-jvm"]}}}

@@ -1,4 +1,6 @@
-{:paths ["src" "test"]
+{;; test-jvm is deliberately absent: those tests need JLine's ScreenTerminal,
+ ;; which is not in babashka's image, and a namespace naming it fails to load
+ :paths ["src" "test"]
  :tasks
  {test:bb {:extra-deps {io.github.cognitect-labs/test-runner {:git/tag "v0.5.1" :git/sha "dfb30dd"}}
            :task cognitect.test-runner/-main}

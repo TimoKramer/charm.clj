@@ -99,7 +99,9 @@
         opts (apply hash-map opts)
         [w h] (:size opts)
         renderer (apply r/create-renderer terminal (apply concat (dissoc opts :size)))]
-    (when w (swap! renderer assoc :width w :height h))
+    ;; update-size!, not a swap! on the map: Display keeps its own idea of the
+    ;; width and pads with a cursor-forward when it disagrees
+    (when w (r/update-size! renderer w h))
     (try
       (r/render! renderer content)
       (.flush (.writer terminal))

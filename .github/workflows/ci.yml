@@ -38,7 +38,7 @@ jobs:
         run: cljfmt check
 
       - name: Lint
-        run: clj-kondo --fail-level error --lint src test
+        run: clj-kondo --fail-level error --lint src test test-jvm
 
       - name: Reflection check
         run: clojure -M:reflection

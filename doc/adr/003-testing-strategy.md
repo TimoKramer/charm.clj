@@ -186,3 +186,27 @@ clj -X:test
 # VHS visual tests (requires vhs installed)
 vhs < test/vhs/list-navigation.tape
 ```
+
+## Addendum (2026-09-20): screen-grid integration tests
+
+Added after the decision above, which it extends rather than revises.
+
+Tier 2 asserts on the escape bytes the renderer wrote. That is the right level for
+"did this sequence reach the terminal", and the wrong one for "what does the user
+see" — those assertions break whenever JLine's `Display` changes how it moves the
+cursor, even when the resulting screen is identical.
+
+`org.jline.utils.ScreenTerminal` is an in-memory VT emulator. `charm.test.screen`
+feeds it the renderer's output and reads the cells back, so a test can assert that
+row 0 reads `╭───────╮` and that those cells are red, rather than matching
+cursor-movement sequences.
+
+Use it for what the user sees. Keep tier 2 for what goes over the wire, which is
+where the sanitizer's guarantees live — "this OSC never reached the terminal" is a
+statement about bytes, not about the screen.
+
+These tests live in `test-jvm/`, not `test/`, because `ScreenTerminal` is not in
+babashka's image, and a namespace that merely names it fails to load there at
+analysis time, so no runtime guard helps. `deps.edn`'s `:test` alias lists both
+directories; `bb.edn` lists only `test`, which is why the babashka run reports
+fewer assertions than the JVM one.
