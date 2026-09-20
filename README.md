@@ -95,7 +95,10 @@ Add to your `deps.edn`. Click the badges to find the latest version and git tag:
               :alt-screen false      ; Use [alternate screen buffer](#alternate-screen-buffer)
               :mouse :cell           ; Mouse mode: nil, :normal, :cell, :all
               :focus-reporting false ; Report focus in/out events
-              :fps 60                ; Frames per second
+              :fps 60                ; Redraws per second, at most
+              :bracketed-paste false ; Deliver a paste as one :paste message
+              :ctrl-c :quit          ; Or :message, to handle it yourself
+              :sanitize true         ; Strip control sequences from the view
 
               ;; Color environment - detected from the terminal when omitted
               :color-profile :ansi256  ; :ascii, :ansi, :ansi256 or :true-color

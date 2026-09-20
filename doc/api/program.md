@@ -25,6 +25,8 @@ Run a TUI program with the Elm Architecture pattern.
 | `:fps` | int | `60` | Frames per second |
 | `:hide-cursor` | boolean | `true` | Hide terminal cursor |
 | `:sanitize` | boolean | `true` | Drop every escape sequence but SGR styling from the view |
+| `:bracketed-paste` | boolean | `false` | Deliver a paste as one [`:paste` message](messages.md#paste-messages) |
+| `:ctrl-c` | keyword | `:quit` | `:quit` stops the program; `:message` delivers Ctrl+C to `update` |
 | `:color-profile` | keyword | `nil` | `:ascii`, `:ansi`, `:ansi256` or `:true-color`; `nil` detects from `TERM`/`COLORTERM` |
 | `:dark-background?` | boolean | `nil` | `nil` queries the terminal |
 
@@ -33,6 +35,42 @@ detecting it, for a terminal that misreports itself or a test that needs a fixed
 environment. Pinning `:dark-background?` also skips the OSC 11 background query,
 and with it the probe timeout that a terminal which never answers costs at every
 startup.
+
+### Frames and throughput
+
+The loop blocks for messages, handles everything queued, and renders at most once
+per `:fps`. So a burst of input - a paste, mouse motion under `:mouse :all`, a
+batch of command results - costs one `view` and one terminal diff rather than one
+each, and no message waits on a timer before it is handled. A message that leaves
+the state `identical?` renders nothing at all.
+
+`:fps` is therefore a ceiling on redraws, not a polling rate: an idle program
+does no work beyond waking once a frame to notice that it should still be
+running.
+
+### Ctrl+C
+
+By default Ctrl+C stops the program before `update` sees it, so a program that
+does not handle it can still be killed from the keyboard. There is no need to
+write a `"ctrl+c"` binding for that.
+
+Pass `:ctrl-c :message` to take it over - to ask for confirmation before
+quitting, or to use it for something else. Then it arrives as an ordinary
+`"ctrl+c"` key press, and quitting is up to the application:
+
+```clojure
+(program/run
+  {:init {}
+   :update (fn [state msg]
+             (if (msg/key-match? msg "ctrl+c")
+               [(assoc state :confirming-quit true) nil]
+               [state nil]))
+   :view view
+   :ctrl-c :message})
+```
+
+An application that takes Ctrl+C over and then never acts on it cannot be
+interrupted from the keyboard.
 
 ### Untrusted content
 
@@ -124,6 +162,11 @@ Create a command from a function that returns a message.
                (Thread/sleep 1000)
                {:type :timer-done}))
 ```
+
+Command bodies run on their own threads, so blocking in one - sleeping, reading a
+file, calling an HTTP API - is expected and will not hold up the event loop or
+any other command. Returning `nil` sends no message, and a command that throws
+becomes an [error message](messages.md#quit-and-error-messages).
 
 ### batch
 

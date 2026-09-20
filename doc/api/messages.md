@@ -220,6 +220,36 @@ Requires `:focus-reporting true` in run options.
     [state nil]))
 ```
 
+## Paste Messages
+
+### paste / paste?
+
+```clojure
+(msg/paste text)  ; Create a paste message
+(msg/paste? msg)  ; => boolean
+(:text msg)       ; the whole pasted text
+```
+
+Requires `:bracketed-paste true` in run options. Without it a paste arrives as
+one key press per character, indistinguishable from fast typing; with it the
+whole paste is a single message.
+
+```clojure
+(defn update-fn [state msg]
+  (cond
+    (msg/paste? msg)
+    [(update state :input str (:text msg)) nil]
+
+    (msg/key-press? msg)
+    [(update state :input str (:key msg)) nil]
+
+    :else
+    [state nil]))
+```
+
+A program that handles only key presses will not see pastes at all once this is
+on, which is why it is off by default.
+
 ## Environment Messages
 
 ### environment
