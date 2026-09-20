@@ -182,10 +182,11 @@ dispatch pool the same twenty would have taken three waves.
 pending puts near zero in practice, and bracketed paste removes the one case that
 could plausibly exceed 1024 — a large paste is now a single message.
 
-The render path itself is out of scope: parsing each line once in `render!`, and
-carrying one representation through the layout stack instead of re-parsing ANSI at
-every layer, are [ADR 008](008-styling-currency.md). This ADR changes *how often*
-`view` and `render!` are called; that one changes what they cost.
+What a frame costs, as opposed to how often one happens, is a separate question.
+Parsing each line once in `render!` has since landed; carrying a different
+representation through the layout stack was tried and rejected, and
+[ADR 008](008-styling-currency.md) records why along with what to do instead.
+This ADR changes *how often* `view` and `render!` are called, not what they cost.
 
 ## Alternatives considered
 

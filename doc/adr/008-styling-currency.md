@@ -2,7 +2,10 @@
 
 ## Status
 
-Proposed
+Rejected. The premise below does not survive measurement — see
+**Why this was rejected** at the end. The alternative it points at is recorded
+there too, because the problem it describes is real even though this answer to it
+is not.
 
 ## Context
 
@@ -229,3 +232,72 @@ into one.
 Step 5 is where fact 3 above gets resolved — the point at which true color
 actually reaches the terminal. Until then the dynamic vars stay as the interim
 mechanism.
+
+## Why this was rejected
+
+Implemented far enough to measure, then reverted. Two assumptions were wrong.
+
+**1. Re-parsing is not what costs.** The whole argument rests on ANSI parsing per
+layer being the expense. It is not: parsing a line and measuring it costs about
+the same as measuring it alone, because `columnLength` has to walk the characters
+for wide ones and grapheme clusters either way. Removing the parse removes almost
+nothing, so neither spans-as-data nor `AttributedString` avoids the real cost.
+
+**2. The win does not survive realistic content.** A block amortises one
+measurement across several layout layers. Measured against the string pipeline,
+with span widths cached at construction and a single `StringBuilder` for emission:
+
+| operation | strings | blocks |
+|---|---|---|
+| short styled label | 0.82 µs | 1.08 µs |
+| 20-line styled block, no layout | 8.8 µs | 11.5 µs |
+| small box: border + padding + width | 9.0 µs | 9.8 µs |
+| bordered + padded **20-line** box | 76 µs | **32 µs** |
+| width + align + border + margin, 20 lines | 192 µs | **44 µs** |
+| `join-horizontal`, 4 blocks of 20×80 | 177 µs | **103 µs** |
+| **realistic view: 40 labels + one box** | **42 µs** | **55 µs** |
+
+Blocks win by 2–4× on large content with several layers stacked on it, and lose
+on everything small. A view is mostly small: forty short labels and a box came
+out 30% slower. Reaching parity on the small cases needed a memoised escape
+table, a per-call style cache, an ASCII fast path for width, and a second
+non-block path in `render` for styles with no layout — which is the tell. The
+caching existed to claw back overhead the representation introduced.
+
+Note also that the cost table in the Context above did not reproduce: the
+bordered-and-padded 20-line box measures 76–105 µs here, not 164 µs. And the
+shape that actually dominates a frame — many small renders — was never measured
+before the decision.
+
+**What is true, and what to do instead.** The real redundancy is not the
+representation, it is that the same text is measured many times. One full
+`style/render` over *n* lines measures roughly 7*n* times: `pad` twice per line
+(once for the widest, once per line), `align-horizontal` once, `apply-border`
+twice, `margin` twice. `render!` then measures again.
+
+Every width after the first is arithmetic — padded is `width + left + right`,
+bordered is that plus the border. So measure the *n* lines once, carry the
+numbers alongside the strings, and roughly 6*n* of the measurements disappear.
+That keeps strings as the currency, keeps every public contract, needs no
+emission boundary, no styles-as-data and no caching, and is confined to
+`style/render` and the layout helpers' internals. It should reach a similar win
+to the one blocks got on deep chains, without the machinery.
+
+**Two other things this turned up**, both since fixed independently:
+
+- `toAnsi` without a `Terminal` rewrites Unicode line-drawing characters as
+  ASCII, so any *styled* text containing them lost them — a styled border
+  rendered as `+--+`. That is a property of JLine's emission, not of the
+  currency, and it would have bitten `AttributedString`-as-currency harder: with
+  the text inside the object there is nowhere to put the escapes but around it.
+- Parsing each line once in `render!` and slicing with `.columnSubSequence`,
+  rather than measuring, cutting via a string and parsing the result again, is
+  worth about 2× on the render path. That is `AttributedString` used at the
+  boundary, where it has a terminal and where parsing genuinely was repeated —
+  and it is the part of this ADR's instinct that paid off.
+
+The two motivations that do **not** depend on the performance argument — true
+color never reaching the terminal (fact 3 above), and retiring the dynamic vars —
+still stand on their own. Both are about the renderer holding the terminal at
+emission time, which is where `render!` already builds `AttributedString`s. They
+do not need a new representation to be solved.

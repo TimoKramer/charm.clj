@@ -143,7 +143,7 @@ anyone calling the public `style/truncate`. `w/truncate` now serialises with
 
 `screen/truncate-line` had exactly one caller and went with it.
 
-### P5 — The styling stack round-trips through ANSI strings at every layer
+### P5 — The styling stack round-trips through ANSI strings at every layer — **rejected as framed**
 
 `style/render` → `pad` → `align-*` → `apply-border` → `margin`, each re-measuring
 each line with a fresh `fromAnsi`.
@@ -164,6 +164,13 @@ or any component uses it.
 **Suggestion:** stop round-tripping — carry one representation through the layout
 stack and serialise only at `render!`. This is the one structural change with
 real headroom; do it after P1–P4, which are cheap and independent.
+
+**Rejected as framed, and measured before rejecting** — the round trip is real
+but it is not what costs. See [ADR 008](adr/008-styling-currency.md), now
+Rejected, for the measurements and for the change that does pay: measure each
+line once and carry the widths as numbers.
+
+The original reasoning is left below for context.
 
 Which representation is [ADR 008](adr/008-styling-currency.md): spans as plain
 Clojure data rather than `AttributedString`, because `AttributedStyle` holds
@@ -986,11 +993,23 @@ a later clean batch. Both under P2. U5 needed a timeout bound that the item did
 not mention, or an unterminated paste freezes the input thread — found by a test
 hanging.
 
-**Phase 4 — rendering architecture**
-P4, then P5 (one representation through the layout stack — spans as data, see
-[ADR 008](adr/008-styling-currency.md)). Largest change, biggest headroom, best
-done once the loop above is stable. Also where premise 1 under J1 gets resolved
-and the Phase 0 dynamic vars are retired.
+**Phase 4 — rendering architecture** — **P4 done, P5 rejected**
+P4 landed: parse each line once in `render!`, 165 µs → 83 µs per frame on 40
+styled lines, and it turned out to be a correctness fix too — cutting a line was
+dropping its styling.
+
+P5 was implemented far enough to measure and then reverted.
+[ADR 008](adr/008-styling-currency.md) is now Rejected and carries the numbers:
+re-parsing is not what costs (measuring a line costs the same either way), and
+blocks win 2–4× on large content with deep layer chains while losing on
+everything small — a realistic view of forty labels and a box came out 30%
+slower. The ADR records the alternative worth trying instead: measure each line
+once and carry the widths as numbers, which removes ~6 of the ~7 measurements per
+line per render without changing the currency.
+
+Premise 1 under J1 (true color) and retiring the dynamic vars are unaffected by
+that rejection — both are about the renderer holding the terminal at emission
+time, not about the representation.
 
 **Phase 5 — JLine adoption + API ergonomics**
 J3 (ScreenTerminal tests — can also be pulled earlier, it's independent),
