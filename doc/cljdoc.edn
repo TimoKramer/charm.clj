@@ -7,7 +7,9 @@
    ["Paginator" {:file "doc/components/paginator.md"}]
    ["Timer" {:file "doc/components/timer.md"}]
    ["Progress" {:file "doc/components/progress.md"}]
-   ["Help" {:file "doc/components/help.md"}]]
+   ["Help" {:file "doc/components/help.md"}]
+   ["Viewport" {:file "doc/components/viewport.md"}]
+   ["Table" {:file "doc/components/table.md"}]]
   ["API Reference" {}
    ["Program" {:file "doc/api/program.md"}]
    ["Messages" {:file "doc/api/messages.md"}]

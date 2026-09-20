@@ -64,6 +64,8 @@ Components integrate with charm's program loop which handles:
 | [timer](timer.md) | Countdown/count-up timer | Yes |
 | [progress](progress.md) | Progress bar display | No |
 | [help](help.md) | Keyboard shortcut display | No |
+| [viewport](viewport.md) | Scrollable window onto long text | No |
+| [table](table.md) | Rows in aligned columns | No |
 
 ## Tick-based Components
 
