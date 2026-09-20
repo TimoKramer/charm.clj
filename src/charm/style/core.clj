@@ -185,9 +185,13 @@
   (let [attr-style (style->attributed-style style)]
     (if (= attr-style AttributedStyle/DEFAULT)
       text
-      (->> (str/split-lines text)
-           (map #(c/attributed->ansi (AttributedString. ^String % attr-style)))
-           (str/join "\n")))))
+      ;; One style for the whole text, so the escapes go round each line and the
+      ;; text itself is untouched - JLine's toAnsi would rewrite characters it
+      ;; assumes the terminal cannot show.
+      (let [[prefix suffix] (c/style->escapes attr-style)]
+        (->> (str/split-lines text)
+             (map #(str prefix % suffix))
+             (str/join "\n"))))))
 
 ;; ---------------------------------------------------------------------------
 ;; Rendering

@@ -209,7 +209,7 @@
         :rgb     (.background style (int (:r color)) (int (:g color)) (int (:b color)))
         style))))
 
-(defn- style->escapes
+(defn style->escapes
   "The escape sequences a style emits, as [prefix suffix].
 
    Read off a one-character probe rather than by styling the real text, because
@@ -226,8 +226,9 @@
 (defn attributed->ansi
   "Serialise an AttributedString to ANSI, leaving its characters alone.
 
-   Emits the same escapes JLine would, one run of styling at a time, but writes
-   the text itself rather than letting `toAnsi` rewrite it. See `style->escapes`."
+   Only needed where one string carries several different styles, which in
+   practice means compositing. Anything applying a single style to text wants
+   `style->escapes` and a `str` - no AttributedString, and no run to find."
   ^String [^AttributedString as]
   (let [len (.length as)
         sb (StringBuilder. (+ len 16))
