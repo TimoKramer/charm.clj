@@ -209,6 +209,46 @@
         :rgb     (.background style (int (:r color)) (int (:g color)) (int (:b color)))
         style))))
 
+(defn- style->escapes
+  "The escape sequences a style emits, as [prefix suffix].
+
+   Read off a one-character probe rather than by styling the real text, because
+   `toAnsi` does two jobs: it emits the escapes, and it rewrites characters it
+   thinks the terminal cannot show. With no Terminal to ask about the character
+   set it assumes the worst and replaces Unicode line-drawing characters with
+   ASCII approximations - so a styled `┌──┐` arrived as `+--+` while an unstyled
+   one came through intact. Only the escapes are wanted here."
+  [^AttributedStyle style]
+  (let [probe (.toAnsi (AttributedString. "X" style))
+        i (.indexOf probe "X")]
+    [(subs probe 0 i) (subs probe (inc i))]))
+
+(defn attributed->ansi
+  "Serialise an AttributedString to ANSI, leaving its characters alone.
+
+   Emits the same escapes JLine would, one run of styling at a time, but writes
+   the text itself rather than letting `toAnsi` rewrite it. See `style->escapes`."
+  ^String [^AttributedString as]
+  (let [len (.length as)
+        sb (StringBuilder. (+ len 16))
+        append-run! (fn [start end ^AttributedStyle style]
+                      (let [[prefix suffix] (style->escapes style)]
+                        (.append sb ^String prefix)
+                        (.append sb ^String (.toString (.subSequence as (int start) (int end))))
+                        (.append sb ^String suffix)))]
+    (loop [i 1
+           start 0
+           ^AttributedStyle current (when (pos? len) (.styleAt as 0))]
+      (cond
+        (zero? len) nil
+        (>= i len) (append-run! start len current)
+        :else (let [^AttributedStyle style (.styleAt as i)]
+                (if (= style current)
+                  (recur (inc i) start current)
+                  (do (append-run! start i current)
+                      (recur (inc i) i style))))))
+    (.toString sb)))
+
 (defn styled-str
   "Create a styled string with foreground and/or background color.
    Returns the string with ANSI escape sequences applied."
@@ -217,8 +257,9 @@
     text
     (let [style (-> AttributedStyle/DEFAULT
                     (apply-color-fg fg)
-                    (apply-color-bg bg))]
-      (.toAnsi (AttributedString. ^String text style)))))
+                    (apply-color-bg bg))
+          [prefix suffix] (style->escapes style)]
+      (str prefix text suffix))))
 
 ;; ---------------------------------------------------------------------------
 ;; Convenience Colors

@@ -8,6 +8,7 @@
      (center-overlay base-text overlay-text)"
   (:require
    [charm.ansi.width :as w]
+   [charm.style.color :as c]
    [clojure.string :as str])
   (:import
    [org.jline.utils AttributedString AttributedStringBuilder]))
@@ -55,7 +56,7 @@
     (let [after-start (+ x overlay-width)]
       (when (< after-start base-width)
         (.append builder ^CharSequence (w/column-sub-sequence base-attr after-start base-width))))
-    (.toAnsi (.toAttributedString builder))))
+    (c/attributed->ansi (.toAttributedString builder))))
 
 ;; ---------------------------------------------------------------------------
 ;; Public API

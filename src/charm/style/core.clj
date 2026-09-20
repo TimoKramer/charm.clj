@@ -186,7 +186,7 @@
     (if (= attr-style AttributedStyle/DEFAULT)
       text
       (->> (str/split-lines text)
-           (map #(.toAnsi (AttributedString. ^String % attr-style)))
+           (map #(c/attributed->ansi (AttributedString. ^String % attr-style)))
            (str/join "\n")))))
 
 ;; ---------------------------------------------------------------------------

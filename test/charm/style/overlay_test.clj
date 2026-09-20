@@ -85,3 +85,16 @@
           lines (str/split-lines result)]
       ;; x=(9-3)/2=3, y=(5-1)/2=2
       (is (str/includes? (nth lines 2) "XXX")))))
+
+(deftest composited-lines-keep-their-characters-test
+  (testing "compositing does not rewrite box-drawing characters"
+    ;; Every composited line goes through an AttributedStringBuilder, whose
+    ;; toAnsi used to turn the base's │ and ─ into | and -
+    (let [base (str/join "\n" (repeat 4 "│    ────    │"))
+          panel "╭─╮\n│x│\n╰─╯"
+          out (overlay/place-overlay base panel 3 1)]
+      (is (str/includes? out "│"))
+      (is (str/includes? out "─"))
+      (is (str/includes? out "╭"))
+      (is (not (str/includes? out "|")))
+      (is (not (str/includes? out "-"))))))

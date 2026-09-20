@@ -60,3 +60,18 @@
     (is (= 2 (b/border-height)))  ; top and bottom
     (is (= 1 (b/border-height :top? true :bottom? false)))
     (is (= 0 (b/border-height :top? false :bottom? false)))))
+
+(deftest styled-border-keeps-its-characters-test
+  (testing "a border with a colour keeps its box-drawing characters"
+    ;; Styling the border used to route its characters through JLine's toAnsi,
+    ;; which replaced them with ASCII: ┌──┐ arrived as +--+
+    (let [result (b/apply-border "hi" :border b/normal :fg {:type :ansi :code 1})
+          lines (str/split-lines result)]
+      (is (str/includes? (first lines) "┌"))
+      (is (str/includes? (first lines) "┐"))
+      (is (str/includes? (second lines) "│"))
+      (is (str/includes? (last lines) "└"))
+      (is (not (str/includes? result "+")))
+      (is (not (str/includes? result "|")))
+      ;; and it is actually styled
+      (is (str/includes? result "\u001b[31m")))))

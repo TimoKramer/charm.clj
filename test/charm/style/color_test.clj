@@ -1,6 +1,8 @@
 (ns charm.style.color-test
   (:require [clojure.test :refer [deftest is testing]]
-            [charm.style.color :as c]))
+            [clojure.string :as str]
+            [charm.style.color :as c])
+  (:import [org.jline.utils AttributedString AttributedStyle]))
 
 (deftest ansi-color-test
   (testing "creates ANSI colors from numbers"
@@ -155,3 +157,42 @@
     (is (= {:type :ansi :code 2} c/green))
     (is (= {:type :ansi :code 7} c/white))
     (is (= {:type :ansi :code 9} c/bright-red))))
+
+(deftest line-drawing-characters-test
+  ;; JLine's toAnsi does two jobs: emit escapes, and rewrite characters it thinks
+  ;; the terminal cannot show. With no Terminal it assumes the worst, so styling
+  ;; text used to turn ┌──┐ into +--+ while unstyled text came through intact.
+  (testing "styled-str keeps line-drawing characters"
+    (let [out (c/styled-str "┌─┤│├─┐" :fg c/red)]
+      (is (str/includes? out "┌─┤│├─┐"))
+      (is (not (str/includes? out "+")))
+      (is (not (str/includes? out "|")))))
+
+  (testing "styled-str keeps other non-ASCII too"
+    (is (str/includes? (c/styled-str "héllo 你好 ✓ →" :fg c/red) "héllo 你好 ✓ →")))
+
+  (testing "an unstyled string is returned unchanged"
+    (is (= "┌──┐" (c/styled-str "┌──┐"))))
+
+  (testing "attributed->ansi emits exactly what JLine would, for ASCII"
+    ;; The escapes are read off a probe, so they must not drift from JLine's own
+    (doseq [style [AttributedStyle/DEFAULT
+                   (.bold AttributedStyle/DEFAULT)
+                   (c/apply-color-fg AttributedStyle/DEFAULT c/red)
+                   (c/apply-color-bg AttributedStyle/DEFAULT c/blue)
+                   (c/apply-color-fg AttributedStyle/DEFAULT (c/rgb 255 128 0))
+                   (-> AttributedStyle/DEFAULT (.bold) (.underline)
+                       (c/apply-color-fg c/red) (c/apply-color-bg c/white))]]
+      (let [as (AttributedString. "plain ASCII text" style)]
+        (is (= (.toAnsi as) (c/attributed->ansi as))
+            (str "drifted for " style)))))
+
+  (testing "attributed->ansi keeps one run per stretch of styling"
+    (let [mixed (AttributedString/fromAnsi "\u001b[31mred\u001b[0m│\u001b[32mgreen\u001b[0m")
+          out (c/attributed->ansi mixed)]
+      (is (str/includes? out "│"))
+      (is (str/includes? out "\u001b[31m"))
+      (is (str/includes? out "\u001b[32m"))))
+
+  (testing "an empty string survives"
+    (is (= "" (c/attributed->ansi (AttributedString. ""))))))
