@@ -1,7 +1,8 @@
 (ns charm.terminal-test
   (:require [clojure.test :refer [deftest is testing]]
             [charm.terminal :as term])
-  (:import [org.jline.terminal Terminal]))
+  (:import [java.io ByteArrayInputStream ByteArrayOutputStream]
+           [org.jline.terminal Terminal Terminal$Signal TerminalBuilder]))
 
 (deftest create-terminal-test
   (testing "create-terminal returns a JLine Terminal"
@@ -72,26 +73,55 @@
         (finally
           (term/close t))))))
 
+(defn- dumb-terminal
+  ^Terminal []
+  (-> (TerminalBuilder/builder)
+      (.dumb true)
+      (.streams (ByteArrayInputStream. (byte-array 0)) (ByteArrayOutputStream.))
+      (.build)))
+
 (deftest signal-handling-test
+  (testing "a handler sees the signal raised on the terminal"
+    ;; JLine's Windows terminal has no SIGWINCH and raises WINCH on the terminal
+    ;; itself when the console reports a resize - only a handler installed on
+    ;; the terminal sees that
+    (let [t (dumb-terminal)
+          fired (atom 0)]
+      (try
+        (term/handle-signal t :winch #(swap! fired inc))
+        (.raise t Terminal$Signal/WINCH)
+        (is (= 1 @fired))
+        (finally
+          (term/close t)))))
+
   (testing "handle-signal returns the handler it replaced, so it can be put back"
-    (let [fired (atom 0)
-          original (term/handle-signal :winch #(swap! fired inc))
-          ours (term/handle-signal :winch #(swap! fired inc))]
-      ;; The second call hands back the handler the first one installed
-      (is (some? ours))
-      (is (not= original ours))
-      (term/restore-signal! :winch original)
-      ;; Restoring put the original back, so it comes round again
-      (is (= original (term/handle-signal :winch #(swap! fired inc))))
-      (term/restore-signal! :winch original)))
+    (let [t (dumb-terminal)
+          fired (atom 0)]
+      (try
+        (let [original (term/handle-signal t :winch #(swap! fired inc))
+              ours (term/handle-signal t :winch #(swap! fired inc))]
+          ;; The second call hands back the handler the first one installed
+          (is (some? ours))
+          (is (not= original ours))
+          (term/restore-signal! t :winch original)
+          ;; Restoring put the original back, so it comes round again
+          (is (= original (term/handle-signal t :winch #(swap! fired inc)))))
+        (finally
+          (term/close t)))))
 
   (testing "restore-signal! tolerates a nil handler"
-    (is (nil? (term/restore-signal! :int nil))))
+    (let [t (dumb-terminal)]
+      (try
+        (is (nil? (term/restore-signal! t :int nil)))
+        (finally
+          (term/close t)))))
 
-  (testing "every signal name is one this platform accepts"
+  (testing "every signal can be handled and restored on the system terminal"
     (is (= #{:int :quit :tstp :cont :winch} (set (keys term/signals))))
-    ;; JLine throws for a signal the platform does not have - INFO, for one,
-    ;; is BSD-only - so registering each in turn is the check that matters
-    (doseq [signal (keys term/signals)]
-      (let [previous (term/handle-signal signal (fn []))]
-        (is (nil? (term/restore-signal! signal previous)))))))
+    (let [t (term/create-terminal)]
+      (try
+        (doseq [signal (keys term/signals)]
+          (let [previous (term/handle-signal t signal (fn []))]
+            (is (nil? (term/restore-signal! t signal previous)))))
+        (finally
+          (term/close t))))))
