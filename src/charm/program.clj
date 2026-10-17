@@ -512,10 +512,10 @@
         ;; Handle window resize and interrupt, keeping the handlers they
         ;; replaced so the finally can put them back
         (reset! previous-winch
-                (term/handle-signal :winch
+                (term/handle-signal terminal :winch
                                     #(check-window-size! terminal msg-chan last-size)))
         (reset! previous-int
-                (term/handle-signal :int
+                (term/handle-signal terminal :int
                                     #(a/put! msg-chan (msg/key-press "c" :ctrl true))))
 
         ;; Check initial window size
@@ -556,8 +556,8 @@
 
           ;; Put back the signal handlers we displaced, before the terminal
           ;; closes under them
-          (term/restore-signal! :winch @previous-winch)
-          (term/restore-signal! :int @previous-int)
+          (term/restore-signal! terminal :winch @previous-winch)
+          (term/restore-signal! terminal :int @previous-int)
 
           ;; Restore the terminal, then stop guarding it
           (restore-terminal! renderer terminal original-attrs)

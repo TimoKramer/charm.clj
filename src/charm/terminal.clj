@@ -1,7 +1,8 @@
 (ns ^:no-doc charm.terminal
   "JLine terminal wrapper for charm.clj"
-  (:import [org.jline.terminal Terminal TerminalBuilder Attributes]
-           [org.jline.utils InfoCmp$Capability Signals]))
+  (:import [org.jline.terminal Terminal TerminalBuilder Attributes
+            Terminal$Signal Terminal$SignalHandler]
+           [org.jline.utils InfoCmp$Capability]))
 
 (defn create-terminal
   "Create a JLine terminal with system I/O and FFM as native interface."
@@ -161,16 +162,16 @@
 ;; ---------------------------------------------------------------------------
 
 (def signals
-  "Signal names we install handlers for, by keyword."
-  {:int "INT"
-   :quit "QUIT"
-   :tstp "TSTP"
-   :cont "CONT"
-   :winch "WINCH"})
+  "Signals we install handlers for, by keyword."
+  {:int Terminal$Signal/INT
+   :quit Terminal$Signal/QUIT
+   :tstp Terminal$Signal/TSTP
+   :cont Terminal$Signal/CONT
+   :winch Terminal$Signal/WINCH})
 
 (defn handle-signal
-  "Install `f`, a no-argument function, as the handler for `signal`
-   (`:int`, `:winch`, ...).
+  "Install `f`, a no-argument function, as the `terminal`'s handler for
+   `signal` (`:int`, `:winch`, ...).
 
    Returns the handler it replaced, which `restore-signal!` puts back. Leaving
    a handler installed after the program exits means a later resize or Ctrl+C
@@ -178,18 +179,20 @@
    the process outlives the program, swallows Ctrl+C for the rest of the
    session.
 
-   JLine 4 also offers `Terminal.handle`, which is the supported route and
-   likewise returns the previous handler, but it needs the nested
-   `Terminal$Signal` and `Terminal$SignalHandler` classes, which babashka cannot
-   resolve. This uses the static `Signals` helper, which works on both."
-  [signal f]
-  (Signals/register (get signals signal)
-                    (reify Runnable
-                      (run [_] (f)))))
+   This goes through `Terminal.handle` rather than the static `Signals` helper,
+   because Windows has no SIGWINCH: JLine's Windows terminal turns a console
+   resize event into a WINCH that only handlers on the terminal see. Reifying
+   `Terminal$SignalHandler` needs babashka 1.13.225 or later."
+  ^Terminal$SignalHandler [^Terminal terminal signal f]
+  (.handle terminal
+           ^Terminal$Signal (get signals signal)
+           (reify Terminal$SignalHandler
+             (handle [_ _] (f)))))
 
 (defn restore-signal!
   "Put back a handler that `handle-signal` returned."
-  [signal handler]
+  [^Terminal terminal signal handler]
   (when handler
-    (Signals/unregister (get signals signal) handler)))
+    (.handle terminal ^Terminal$Signal (get signals signal) handler)
+    nil))
 
