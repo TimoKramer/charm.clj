@@ -231,7 +231,7 @@
   "Force a full repaint on next render."
   [renderer]
   (let [^Display display (:display @renderer)]
-    (.clear display)))
+    (.reset display)))
 
 ;; ---------------------------------------------------------------------------
 ;; Size Updates

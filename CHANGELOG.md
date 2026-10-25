@@ -16,6 +16,9 @@ and an event loop that no longer caps input at about 100 messages a second.
 
 ### Added
 
+- **`program/suspend-cmd`**, which stops Charm's input reader and restores the
+  terminal while a blocking callback uses it, then resumes rendering and input
+  and forces a full repaint.
 - **`merge-style`**, which returns a copy of a style with the named options
   changed. `(merge base variant)` overwrites the base with the variant's
   *defaults* - nil colors, false attributes - rather than inheriting them, which
