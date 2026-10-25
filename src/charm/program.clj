@@ -201,7 +201,8 @@
     :else
     (let [resize? (msg/window-size? m)]
       (when resize?
-        (render/update-size! renderer (:width m) (:height m)))
+        (render/update-size! renderer (:width m) (:height m))
+        (render/repaint! renderer))
       (let [old-state @state
             [new-state cmd] (update old-state m)]
         (reset! state new-state)

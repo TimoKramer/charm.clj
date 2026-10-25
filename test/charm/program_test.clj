@@ -104,13 +104,19 @@
         (is (true? (handle-msg! (ctx (fn [st _] [(into {} st) nil]) state)
                                 (msg/key-press "x"))))))
 
-    (testing "a resize dirties the frame even when the app ignores it"
+    (testing "a resize updates and repaints the display before the app update"
       (let [state (atom {:n 0})
-            resized (atom nil)]
-        (with-redefs [render/update-size! (fn [_ w h] (reset! resized [w h]))]
-          (is (true? (handle-msg! (ctx (fn [st _] [st nil]) state)
+            events (atom [])
+            update (fn [st _]
+                     (swap! events conj :update)
+                     [st nil])]
+        (with-redefs [render/update-size! (fn [_ w h]
+                                            (swap! events conj [:resize w h]))
+                      render/repaint! (fn [_]
+                                        (swap! events conj :repaint))]
+          (is (true? (handle-msg! (ctx update state)
                                   (p/window-size-msg 80 24))))
-          (is (= [80 24] @resized)))))
+          (is (= [[:resize 80 24] :repaint :update] @events)))))
 
     (testing "ctrl+c quits by default, without reaching update"
       (let [running? (atom true)
