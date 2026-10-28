@@ -181,6 +181,12 @@ and an event loop that no longer caps input at about 100 messages a second.
 
 ### Fixed
 
+- **Resizing the terminal works on Windows.** Windows has no SIGWINCH, so the
+  WINCH handler charm installed through JLine's static `Signals` helper never
+  ran and a program only ever saw its startup size. Signal handlers now go
+  through `Terminal.handle`, which receives the WINCH JLine's Windows terminal
+  raises when the console reports a resize
+  ([#20](https://github.com/TimoKramer/charm.clj/issues/20)).
 - **Styling no longer rewrites line-drawing characters as ASCII.** JLine's
   `toAnsi` both emits a style's escapes and rewrites characters it assumes the
   terminal cannot show, so `(style/render (style/style :border normal :border-fg
@@ -233,4 +239,5 @@ and an event loop that no longer caps input at about 100 messages a second.
 ### Requirements
 
 JDK 22+. Ships with JLine 4.4.5, which carries the palette fixes above.
-Babashka with JLine 4.4.5 (currently on master) for use with babashka.
+Babashka 1.13.225 or later, which ships JLine 4.4.5 and can reify
+`Terminal$SignalHandler`.
