@@ -97,6 +97,7 @@ Add to your `deps.edn`. Click the badges to find the latest version and git tag:
               :focus-reporting false ; Report focus in/out events
               :fps 60                ; Redraws per second, at most
               :bracketed-paste false ; Deliver a paste as one :paste message
+              :kitty-keyboard false  ; Report Shift+Enter etc. as distinct keys
               :ctrl-c :quit          ; Or :message, to handle it yourself
               :sanitize true         ; Strip control sequences from the view
 

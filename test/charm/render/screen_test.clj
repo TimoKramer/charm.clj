@@ -23,6 +23,11 @@
     (is (= "\u001b[?2004h" scr/enable-bracketed-paste))
     (is (= "\u001b[?2004l" scr/disable-bracketed-paste))))
 
+(deftest kitty-keyboard-test
+  (testing "kitty keyboard protocol sequences push and pop the mode"
+    (is (= "\u001b[>1u" scr/enable-kitty-keyboard))
+    (is (= "\u001b[<u" scr/disable-kitty-keyboard))))
+
 (deftest window-title-test
   (testing "sets window title"
     (is (= "\u001b]2;Hello\u0007" (scr/set-window-title "Hello"))))

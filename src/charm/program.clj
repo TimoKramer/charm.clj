@@ -74,6 +74,7 @@
    :hide-cursor true
    :sanitize true
    :bracketed-paste false
+   :kitty-keyboard false
    :ctrl-c :quit
    :overflow :top
    :color-profile nil    ; nil - detect from the environment
@@ -520,6 +521,14 @@
                       per character, so an application can tell a paste from
                       fast typing. Off by default, because a program that only
                       handles key presses would stop seeing pastes at all.
+     :kitty-keyboard - Ask the terminal for Kitty keyboard protocol reports
+                      (default: false). Terminals send the same bytes for
+                      Enter and Shift+Enter; with this on, a terminal that
+                      supports the protocol reports them as distinct keys
+                      (`{:type :enter :shift true}`), and likewise for other
+                      modified keys. Terminals that do not support it ignore
+                      the request. The mode is switched off again when the
+                      program exits or suspends.
      :overflow      - Which end to drop lines from when the view is taller than
                       the terminal: :top (default) keeps the last lines, which
                       suits an inline program; :bottom keeps the first ones,
@@ -551,7 +560,7 @@
   [{:keys [init update view running?] :as opts}]
   (let [opts (merge (default-opts) opts)
         {:keys [alt-screen mouse focus-reporting fps hide-cursor sanitize
-                bracketed-paste ctrl-c overflow]} opts
+                bracketed-paste kitty-keyboard ctrl-c overflow]} opts
 
         ;; Create terminal and save original attributes for restoration
         terminal (term/create-terminal)
@@ -572,6 +581,7 @@
                                          :hide-cursor hide-cursor
                                          :sanitize sanitize
                                          :bracketed-paste bracketed-paste
+                                         :kitty-keyboard kitty-keyboard
                                          :overflow overflow)
 
         ;; Message channel

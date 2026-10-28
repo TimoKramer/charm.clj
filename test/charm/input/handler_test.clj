@@ -30,6 +30,10 @@
     (is (= {:type :runes :runes "a" :alt true} (h/parse-input 27 "a")))
     (is (= {:type :runes :runes "x" :alt true} (h/parse-input 27 "x"))))
 
+  (testing "kitty keyboard protocol key reports"
+    (is (= {:type :enter :shift true} (h/parse-input 27 "[13;2u")))
+    (is (= {:type :runes :runes "c" :ctrl true} (h/parse-input 27 "[99;5u"))))
+
   (testing "function keys"
     (is (= {:type :f1} (h/parse-input 27 "OP")))
     (is (= {:type :f5} (h/parse-input 27 "[15~"))))
