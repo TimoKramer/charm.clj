@@ -97,6 +97,7 @@ Add to your `deps.edn`. Click the badges to find the latest version and git tag:
               :focus-reporting false ; Report focus in/out events
               :fps 60                ; Redraws per second, at most
               :bracketed-paste false ; Deliver a paste as one :paste message
+              :kitty-keyboard false  ; Report Shift+Enter etc. as distinct keys
               :ctrl-c :quit          ; Or :message, to handle it yourself
               :sanitize true         ; Strip control sequences from the view
 
@@ -139,7 +140,8 @@ Messages are maps with a `:type` key. Built-in message types:
 
 ### Commands
 
-Commands are async functions that produce messages:
+Commands produce messages; most run asynchronously, while `suspend-cmd` is a
+blocking terminal handoff:
 
 ```clojure
 ;; Quit the program
@@ -154,6 +156,13 @@ program/quit-cmd
 ;; Run commands in sequence
 (program/sequence-cmds cmd1 cmd2 cmd3)
 ```
+
+Use `program/suspend-cmd` when a blocking callback needs to use the terminal,
+such as launching `$EDITOR`. Charm pauses and joins its input reader, restores
+the terminal before calling the callback, then restores raw mode, resumes input
+and rendering, and repaints when the callback returns. The callback can return a
+message or `nil`; exceptions become normal error messages. Unlike an ordinary
+command, it blocks the event loop while the terminal is handed off.
 
 ### Styling
 

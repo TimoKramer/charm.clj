@@ -24,12 +24,15 @@
      :sanitize    - Drop everything but SGR styling from rendered content
                     (default: true)
      :bracketed-paste - Ask the terminal to bracket pasted text (default: false)
+     :kitty-keyboard  - Ask the terminal for Kitty keyboard protocol key
+                        reports (default: false)
      :overflow    - Which end to drop lines from when the view is taller than
                     the terminal: :top (default) or :bottom"
   [^Terminal terminal & {:keys [fps alt-screen hide-cursor sanitize bracketed-paste
-                                overflow]
+                                kitty-keyboard overflow]
                          :or {fps 60 alt-screen false hide-cursor true
                               sanitize true bracketed-paste false
+                              kitty-keyboard false
                               overflow :top}}]
   (let [{:keys [width height]} (term/get-size terminal)
         display (doto (Display. terminal false)
@@ -42,6 +45,7 @@
            :hide-cursor hide-cursor
            :sanitize sanitize
            :bracketed-paste bracketed-paste
+           :kitty-keyboard kitty-keyboard
            :overflow overflow
            :width width
            :height height
@@ -167,6 +171,21 @@
   (write-terminal! renderer scr/disable-bracketed-paste))
 
 ;; ---------------------------------------------------------------------------
+;; Kitty Keyboard Protocol
+;; ---------------------------------------------------------------------------
+
+(defn enable-kitty-keyboard!
+  "Ask the terminal to report keys with the Kitty keyboard protocol. A terminal
+   that does not support it ignores the request."
+  [renderer]
+  (write-terminal! renderer scr/enable-kitty-keyboard))
+
+(defn disable-kitty-keyboard!
+  "Return the terminal to its previous keyboard reporting mode."
+  [renderer]
+  (write-terminal! renderer scr/disable-kitty-keyboard))
+
+;; ---------------------------------------------------------------------------
 ;; Window Title
 ;; ---------------------------------------------------------------------------
 
@@ -231,7 +250,7 @@
   "Force a full repaint on next render."
   [renderer]
   (let [^Display display (:display @renderer)]
-    (.clear display)))
+    (.reset display)))
 
 ;; ---------------------------------------------------------------------------
 ;; Size Updates
@@ -256,19 +275,24 @@
 (defn start!
   "Start the renderer."
   [renderer]
-  (let [{:keys [alt-screen hide-cursor bracketed-paste]} @renderer]
+  (let [{:keys [alt-screen hide-cursor bracketed-paste kitty-keyboard]} @renderer]
     (when hide-cursor
       (hide-cursor! renderer))
     (when alt-screen
       (enter-alt-screen! renderer))
     (when bracketed-paste
       (enable-bracketed-paste! renderer))
+    (when kitty-keyboard
+      (enable-kitty-keyboard! renderer))
     (swap! renderer assoc :running true)))
 
 (defn stop!
   "Stop the renderer and restore terminal state."
   [renderer]
-  (let [{:keys [in-alt-screen hide-cursor bracketed-paste]} @renderer]
+  (let [{:keys [in-alt-screen hide-cursor bracketed-paste kitty-keyboard]} @renderer]
+    (when kitty-keyboard
+      ;; Without this the shell keeps receiving Kitty key reports after exit.
+      (disable-kitty-keyboard! renderer))
     (when bracketed-paste
       (disable-bracketed-paste! renderer))
     (when in-alt-screen

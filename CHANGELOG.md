@@ -16,6 +16,9 @@ and an event loop that no longer caps input at about 100 messages a second.
 
 ### Added
 
+- **`program/suspend-cmd`**, which stops Charm's input reader and restores the
+  terminal while a blocking callback uses it, then resumes rendering and input
+  and forces a full repaint.
 - **`merge-style`**, which returns a copy of a style with the named options
   changed. `(merge base variant)` overwrites the base with the variant's
   *defaults* - nil colors, false attributes - rather than inheriting them, which
@@ -29,6 +32,13 @@ and an event loop that no longer caps input at about 100 messages a second.
   key press per character that an application cannot tell apart from fast
   typing. `msg/paste` and `msg/paste?` come with it. Off by default, because a
   program that handles only key presses would otherwise stop seeing pastes.
+- **`:kitty-keyboard` option on `run`** (default `false`). Terminals send the
+  same bytes for Enter and Shift+Enter. With it on, a terminal that supports the
+  Kitty keyboard protocol reports modified keys as distinct sequences, and
+  charm decodes them: Shift+Enter arrives as `{:type :enter :shift true}`.
+  The mode is switched off again when the program exits or suspends, so the
+  shell is not left receiving Kitty reports. Terminals without the protocol
+  ignore the request.
 - **`:ctrl-c` option on `run`** (default `:quit`). Ctrl+C now stops the program
   before `update` sees it, so a program that does not handle it can still be
   killed from the keyboard. Pass `:message` to take it over - to confirm before

@@ -83,3 +83,31 @@
            (k/make-key {:type :runes :runes "c" :ctrl true})))
     (is (= {:type :up :shift true :alt true}
            (k/make-key {:type :up :shift true :alt true})))))
+
+(deftest parse-kitty-key-sequence-test
+  (testing "Shift+Enter is distinct from Enter"
+    (is (= {:type :enter :shift true} (k/parse-escape-sequence "[13;2u")))
+    (is (= {:type :enter} (k/parse-escape-sequence "[13u"))))
+
+  (testing "modifier bits"
+    (is (= {:type :runes :runes "c" :ctrl true} (k/parse-escape-sequence "[99;5u")))
+    (is (= {:type :runes :runes "a" :alt true :shift true} (k/parse-escape-sequence "[97;4u")))
+    (is (= {:type :runes :runes "x" :super true} (k/parse-escape-sequence "[120;9u"))))
+
+  (testing "special codepoints"
+    (is (= {:type :escape} (k/parse-escape-sequence "[27u")))
+    (is (= {:type :tab} (k/parse-escape-sequence "[9u")))
+    (is (= {:type :backspace} (k/parse-escape-sequence "[127u")))
+    (is (= {:type :space} (k/parse-escape-sequence "[32u"))))
+
+  (testing "event-type and text sub-fields are accepted"
+    (is (= {:type :enter :shift true} (k/parse-escape-sequence "[13;2:1u")))
+    (is (= {:type :runes :runes "a"} (k/parse-escape-sequence "[97;1:1;97u"))))
+
+  (testing "characters outside the BMP"
+    (is (= {:type :runes :runes "😀"} (k/parse-escape-sequence "[128512u"))))
+
+  (testing "other sequences are untouched"
+    (is (= {:type :up} (k/parse-escape-sequence "[A")))
+    (is (nil? (k/parse-kitty-key-sequence "[A")))
+    (is (nil? (k/parse-kitty-key-sequence "[13;2")))))

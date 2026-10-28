@@ -109,6 +109,25 @@
       (finally
         (term/close terminal)))))
 
+(deftest repaint-writes-an-unchanged-frame-again
+  (let [input (java.io.ByteArrayInputStream. (byte-array 0))
+        output (java.io.ByteArrayOutputStream.)
+        terminal (-> (org.jline.terminal.TerminalBuilder/builder)
+                     (.dumb true)
+                     (.streams input output)
+                     (.build))
+        renderer (r/create-renderer terminal)]
+    (try
+      (r/render! renderer "same frame")
+      (.flush (.writer terminal))
+      (let [first-render-size (.size output)]
+        (r/repaint! renderer)
+        (r/render! renderer "same frame")
+        (.flush (.writer terminal))
+        (is (> (.size output) first-render-size)))
+      (finally
+        (term/close terminal)))))
+
 (deftest render-sanitizes-content-test
   ;; JLine's own fromAnsi drops OSC, DCS and standard CSI as of 4.4.5, so the
   ;; sequences that still reach a terminal unaided are the ones it keeps: ESC c

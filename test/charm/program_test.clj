@@ -3,6 +3,7 @@
             [charm.program :as p]
             [charm.message :as msg]
             [charm.render.core :as render]
+            [charm.terminal :as term]
             [clojure.core.async :as a]
             [charm.style.color :as color]))
 
@@ -13,6 +14,11 @@
   (testing "creates command from function"
     (let [c (p/cmd (fn [] (msg/quit)))]
       (is (= :cmd (:type c)))
+      (is (fn? (:fn c)))))
+
+  (testing "creates a command that temporarily relinquishes the terminal"
+    (let [c (p/suspend-cmd (fn [] (msg/quit)))]
+      (is (= :suspend (:type c)))
       (is (fn? (:fn c))))))
 
 (deftest batch-test
@@ -98,13 +104,19 @@
         (is (true? (handle-msg! (ctx (fn [st _] [(into {} st) nil]) state)
                                 (msg/key-press "x"))))))
 
-    (testing "a resize dirties the frame even when the app ignores it"
+    (testing "a resize updates and repaints the display before the app update"
       (let [state (atom {:n 0})
-            resized (atom nil)]
-        (with-redefs [render/update-size! (fn [_ w h] (reset! resized [w h]))]
-          (is (true? (handle-msg! (ctx (fn [st _] [st nil]) state)
+            events (atom [])
+            update (fn [st _]
+                     (swap! events conj :update)
+                     [st nil])]
+        (with-redefs [render/update-size! (fn [_ w h]
+                                            (swap! events conj [:resize w h]))
+                      render/repaint! (fn [_]
+                                        (swap! events conj :repaint))]
+          (is (true? (handle-msg! (ctx update state)
                                   (p/window-size-msg 80 24))))
-          (is (= [80 24] @resized)))))
+          (is (= [[:resize 80 24] :repaint :update] @events)))))
 
     (testing "ctrl+c quits by default, without reaching update"
       (let [running? (atom true)
@@ -243,6 +255,206 @@
             (reset! running? false)
             (deref done 2000 nil)))
         (is (= 1 @renders))))))
+
+(deftest suspend-request-test
+  (let [handle-msg! #'p/handle-msg!
+        msg-chan (a/chan 8)
+        completed (promise)
+        context (ctx (fn [state _] [state nil])
+                     (atom {})
+                     :msg-chan msg-chan
+                     :suspend! (fn [callback] (callback)))
+        request {:type ::p/suspend-request
+                 :fn #(msg/key-press "resumed")
+                 :completion completed}]
+    (is (true? (handle-msg! context request)))
+    (is (true? @completed))
+    (is (= "resumed" (:key (a/poll! msg-chan)))))
+
+  (testing "callback failures become error messages after completion"
+    (let [handle-msg! #'p/handle-msg!
+          msg-chan (a/chan 8)
+          completed (promise)
+          context (ctx (fn [state _] [state nil])
+                       (atom {})
+                       :msg-chan msg-chan
+                       :suspend! (fn [_] (throw (ex-info "editor failed" {}))))
+          request {:type ::p/suspend-request
+                   :fn (fn [] nil)
+                   :completion completed}]
+      (is (true? (handle-msg! context request)))
+      (is (true? @completed))
+      (is (msg/error? (a/poll! msg-chan))))))
+
+(deftest suspend-terminal-test
+  (let [events (atom [])
+        lifecycle {:terminal ::terminal
+                   :renderer ::renderer
+                   :original-attrs ::original-attrs
+                   :msg-chan (a/chan 8)
+                   :running? (atom true)
+                   :input-running? (atom true)
+                   :input-thread (atom ::input-thread)
+                   :last-size (atom {:width 80 :height 24})
+                   :mouse :normal
+                   :focus-reporting true}
+        stubs {#'p/stop-input-loop!
+               (fn [input-running? input-thread]
+                 (swap! events conj :stop-input)
+                 (reset! input-running? false)
+                 (reset! input-thread nil))
+               #'p/restore-terminal! (fn [& _]
+                                       (swap! events conj :stop-renderer)
+                                       (swap! events conj :restore-attributes)
+                                       nil)
+               #'term/enter-raw-mode (fn [_] (swap! events conj :enter-raw-mode))
+               #'render/start! (fn [_] (swap! events conj :start-renderer))
+               #'render/enable-mouse! (fn [_ _] (swap! events conj :enable-mouse))
+               #'render/enable-focus-reporting! (fn [_] (swap! events conj :enable-focus))
+               #'render/repaint! (fn [_] (swap! events conj :repaint))
+               #'p/check-window-size! (fn [& _] (swap! events conj :check-size))
+               #'p/start-input-loop! (fn [& _]
+                                       (swap! events conj :start-input)
+                                       ::input-thread)}]
+    (testing "suspends and resumes in order"
+      (with-redefs-fn stubs
+        (fn []
+          (let [result (#'p/suspend-terminal!
+                        lifecycle
+                        (fn []
+                          (swap! events conj :callback)
+                          :edited))]
+            (is (= :edited result))
+            (is (= [:stop-input
+                    :stop-renderer
+                    :restore-attributes
+                    :callback
+                    :enter-raw-mode
+                    :start-renderer
+                    :enable-mouse
+                    :enable-focus
+                    :repaint
+                    :check-size
+                    :start-input]
+                   @events))))))
+
+    (testing "resumes even when the callback fails"
+      (reset! events [])
+      (with-redefs-fn stubs
+        (fn []
+          (is (thrown? clojure.lang.ExceptionInfo
+                       (#'p/suspend-terminal!
+                        lifecycle
+                        (fn []
+                          (swap! events conj :callback)
+                          (throw (ex-info "editor failed" {}))))))
+          (is (= [:stop-input
+                  :stop-renderer
+                  :restore-attributes
+                  :callback
+                  :enter-raw-mode
+                  :start-renderer
+                  :enable-mouse
+                  :enable-focus
+                  :repaint
+                  :check-size
+                  :start-input]
+                 @events)))))
+
+    (testing "does not run the callback when restoration fails"
+      (reset! events [])
+      (with-redefs-fn (assoc stubs
+                             #'p/restore-terminal!
+                             (fn [& _]
+                               (swap! events conj :restore-failed)
+                               (ex-info "restore failed" {})))
+        (fn []
+          (is (thrown? clojure.lang.ExceptionInfo
+                       (#'p/suspend-terminal! lifecycle
+                                              (fn []
+                                                (swap! events conj :callback)))))
+          (is (= [:stop-input
+                  :restore-failed
+                  :enter-raw-mode
+                  :start-renderer
+                  :enable-mouse
+                  :enable-focus
+                  :repaint
+                  :check-size
+                  :start-input]
+                 @events)))))))
+
+(deftest release-pending-suspend-requests-test
+  (let [release! #'p/release-pending-suspend-requests!
+        msg-chan (a/chan 2)
+        completion (promise)]
+    (a/>!! msg-chan {:type ::p/suspend-request :completion completion})
+    (a/close! msg-chan)
+    (release! msg-chan)
+    (is (true? @completion))))
+
+(deftest stop-input-loop-test
+  (let [stop! #'p/stop-input-loop!
+        input-running? (atom true)
+        started (promise)
+        thread (Thread. (fn []
+                          (deliver started true)
+                          (try
+                            (Thread/sleep 10000)
+                            (catch InterruptedException _ nil))))
+        input-thread (atom thread)]
+    (.start thread)
+    @started
+    (stop! input-running? input-thread)
+    (is (false? @input-running?))
+    (is (nil? @input-thread))
+    (is (false? (.isAlive thread)))))
+
+(deftest suspend-in-sequence-test
+  (let [execute-cmd! #'p/execute-cmd!
+        handle-msg! #'p/handle-msg!
+        msg-chan (a/chan 8)
+        order (atom [])
+        take! (fn [] (first (a/alts!! [msg-chan (a/timeout 5000)])))
+        context (ctx (fn [state _] [state nil])
+                     (atom {})
+                     :msg-chan msg-chan
+                     :suspend! (fn [callback] (callback)))
+        command (p/sequence-cmds
+                 (p/suspend-cmd (fn []
+                                  (swap! order conj :suspended)
+                                  (msg/key-press "suspended")))
+                 (p/cmd (fn []
+                          (swap! order conj :after)
+                          (msg/key-press "after"))))]
+    (execute-cmd! command msg-chan)
+    (let [request (take!)]
+      (is (= ::p/suspend-request (:type request)))
+      (handle-msg! context request))
+    (is (= "suspended" (:key (take!))))
+    (is (= "after" (:key (take!))))
+    (is (= [:suspended :after] @order))))
+
+(deftest execute-suspend-cmd-test
+  (let [execute-cmd! #'p/execute-cmd!
+        handle-msg! #'p/handle-msg!
+        msg-chan (a/chan 8)
+        called? (atom false)
+        context (ctx (fn [state _] [state nil])
+                     (atom {})
+                     :msg-chan msg-chan
+                     :suspend! (fn [callback] (callback)))
+        take! (fn [] (first (a/alts!! [msg-chan (a/timeout 5000)])))]
+    (execute-cmd! (p/suspend-cmd (fn []
+                                   (reset! called? true)
+                                   (msg/key-press "resumed")))
+                  msg-chan)
+    (let [request (take!)]
+      (is (= ::p/suspend-request (:type request)))
+      (is (false? @called?))
+      (handle-msg! context request))
+    (is (true? @called?))
+    (is (= "resumed" (:key (take!))))))
 
 (deftest execute-cmd-test
   (let [execute-cmd! #'p/execute-cmd!

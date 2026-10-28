@@ -6,7 +6,8 @@
    - update: (state, msg) -> [new-state, cmd]
    - view: state -> string
 
-   Commands are functions that produce messages asynchronously."
+   Commands produce messages; most run asynchronously, while `suspend-cmd`
+   temporarily relinquishes the terminal for a blocking callback."
   (:require
    [charm.input.handler :as input]
    [charm.input.keymap :as km]
@@ -27,6 +28,14 @@
    The function will be called asynchronously."
   [f]
   {:type :cmd :fn f})
+
+(defn suspend-cmd
+  "Create a command that runs `f` while Charm relinquishes the terminal.
+
+   The callback runs on the event-loop thread and blocks it until it returns.
+   Use this for a child process that needs terminal input, such as an editor."
+  [f]
+  {:type :suspend :fn f})
 
 (defn batch
   "Combine multiple commands into one."
@@ -65,6 +74,7 @@
    :hide-cursor true
    :sanitize true
    :bracketed-paste false
+   :kitty-keyboard false
    :ctrl-c :quit
    :overflow :top
    :color-profile nil    ; nil - detect from the environment
@@ -94,11 +104,24 @@
     (catch Exception e
       (a/>!! msg-chan (msg/error e)))))
 
+(defn- suspend-request
+  [f completion]
+  (cond-> {:type ::suspend-request :fn f}
+    completion (assoc :completion completion)))
+
+(defn- enqueue-suspend!
+  "Ask the event loop to run `f` while Charm has relinquished the terminal."
+  [f msg-chan]
+  (a/io-thread
+   (a/>!! msg-chan (suspend-request f nil))))
+
 (defn- execute-cmd!
   "Execute a command and send the resulting message to the channel.
 
-   Command bodies run on `a/io-thread`, which is a virtual thread where the
-   runtime has them. Two reasons, in order of how much they matter:
+   Ordinary command bodies run on `a/io-thread`, which is a virtual thread where
+   the runtime has them. A suspended command instead asks the event loop to run
+   its callback while the terminal is restored. Ordinary commands use a
+   blocking-friendly execution context for two reasons:
 
    Not a `go` block, because a command is arbitrary user code and is usually
    where a program does its blocking work - sleeping, reading a file, calling an
@@ -123,6 +146,9 @@
       :cmd
       (a/io-thread (run-cmd-fn! (:fn cmd) msg-chan))
 
+      :suspend
+      (enqueue-suspend! (:fn cmd) msg-chan)
+
       :batch
       (doseq [c (:cmds cmd)]
         (execute-cmd! c msg-chan))
@@ -130,7 +156,11 @@
       :sequence
       (a/io-thread
        (doseq [c (:cmds cmd)]
-         (run-cmd-fn! (:fn c) msg-chan)))
+         (if (= :suspend (:type c))
+           (let [completion (promise)]
+             (when (a/>!! msg-chan (suspend-request (:fn c) completion))
+               @completion))
+           (run-cmd-fn! (:fn c) msg-chan))))
 
       nil)))
 
@@ -143,8 +173,20 @@
 
    A quit message stops the loop, and an error stops it and is rethrown so it
    surfaces on the caller's thread."
-  [{:keys [renderer update state msg-chan running? ctrl-c]} m]
+  [{:keys [renderer update state msg-chan running? ctrl-c suspend!]} m]
   (cond
+    (= ::suspend-request (:type m))
+    (do
+      (try
+        (when-let [result (suspend! (:fn m))]
+          (a/put! msg-chan result))
+        (catch Exception error
+          (a/put! msg-chan (msg/error error)))
+        (finally
+          (when-let [completion (:completion m)]
+            (deliver completion true))))
+      true)
+
     (msg/quit? m)
     (do (reset! running? false) false)
 
@@ -160,7 +202,8 @@
     :else
     (let [resize? (msg/window-size? m)]
       (when resize?
-        (render/update-size! renderer (:width m) (:height m)))
+        (render/update-size! renderer (:width m) (:height m))
+        (render/repaint! renderer))
       (let [old-state @state
             [new-state cmd] (update old-state m)]
         (reset! state new-state)
@@ -265,25 +308,29 @@
    Returns the pasted text. Without this the characters arrive as ordinary key
    presses and the markers are indistinguishable from typed input, so an
    application cannot tell a paste from someone typing very fast."
-  [^Terminal terminal keymap running?]
-  (let [sb (StringBuilder.)]
-    (loop [timeouts 0]
-      (if (or (not @running?) (>= timeouts max-paste-timeouts))
-        (.toString sb)
-        (let [event (input/read-event terminal
-                                      :timeout-ms paste-read-timeout-ms
-                                      :keymap keymap)]
-          (case (:type event)
-            :paste-end (.toString sb)
-            :runes (do (.append sb ^String (:runes event)) (recur 0))
-            ;; A newline or tab inside a paste is text, not a key press
-            :enter (do (.append sb "\n") (recur 0))
-            :tab (do (.append sb "\t") (recur 0))
-            ;; nil is a read timeout - the paste may still be arriving
-            nil (recur (inc timeouts))
-            ;; Anything else cannot be part of the pasted text; drop it and keep
-            ;; going rather than ending the paste early
-            (recur 0)))))))
+  ([^Terminal terminal keymap running?]
+   (read-paste terminal keymap running? running?))
+  ([^Terminal terminal keymap running? input-running?]
+   (let [sb (StringBuilder.)]
+     (loop [timeouts 0]
+       (if (or (not @running?)
+               (not @input-running?)
+               (>= timeouts max-paste-timeouts))
+         (.toString sb)
+         (let [event (input/read-event terminal
+                                       :timeout-ms paste-read-timeout-ms
+                                       :keymap keymap)]
+           (case (:type event)
+             :paste-end (.toString sb)
+             :runes (do (.append sb ^String (:runes event)) (recur 0))
+             ;; A newline or tab inside a paste is text, not a key press
+             :enter (do (.append sb "\n") (recur 0))
+             :tab (do (.append sb "\t") (recur 0))
+             ;; nil is a read timeout - the paste may still be arriving
+             nil (recur (inc timeouts))
+             ;; Anything else cannot be part of the pasted text; drop it and keep
+             ;; going rather than ending the paste early
+             (recur 0))))))))
 
 (def ^:private max-input-failures
   "Consecutive read failures tolerated before giving up on the terminal.
@@ -300,33 +347,37 @@
 (defn- start-input-loop!
   "Start reading terminal input and sending to message channel.
    Returns the thread so it can be interrupted on shutdown."
-  [^Terminal terminal msg-chan running?]
+  [^Terminal terminal msg-chan running? input-running?]
   (let [;; Create terminal-aware keymap for escape sequence lookup
         keymap (km/create-keymap terminal)
         thread
         (Thread.
          (fn []
            (loop [failures 0]
-             (when @running?
+             (when (and @running? @input-running?)
                (let [failure
                      (try
                        (when-let [event (input/read-event terminal
                                                           :timeout-ms 100
                                                           :keymap keymap)]
-                         (a/put! msg-chan
-                                 (if (= :paste-start (:type event))
-                                   (msg/paste (read-paste terminal keymap running?))
-                                   (event->msg event))))
+                         (let [message (if (= :paste-start (:type event))
+                                         (msg/paste (read-paste terminal
+                                                                keymap
+                                                                running?
+                                                                input-running?))
+                                         (event->msg event))]
+                           (when (and @running? @input-running?)
+                             (a/put! msg-chan message))))
                        nil
                        (catch InterruptedException _
-                         (reset! running? false)
+                         (reset! input-running? false)
                          nil)
                        (catch Exception e
                          ;; Expected while shutting down, when the reader is
                          ;; closed under us; only a run of them is a problem.
                          e))]
                  (cond
-                   (not @running?) nil
+                   (or (not @running?) (not @input-running?)) nil
 
                    failure
                    (let [failures (inc failures)]
@@ -338,7 +389,8 @@
                                                 failures " times in a row; giving up")
                                            {:failures failures}
                                            failure)))
-                         (reset! running? false))
+                         (reset! running? false)
+                         (reset! input-running? false))
                        (do
                          (Thread/sleep (input-backoff-ms failures))
                          (recur failures))))
@@ -356,13 +408,40 @@
    Runs from `run`'s finally and from the shutdown hook, so it has to tolerate
    being called twice and after the terminal is already gone."
   [renderer ^Terminal terminal ^Attributes original-attrs]
-  (try
-    (render/stop! renderer)
-    (term/set-attributes terminal original-attrs)
-    (catch Exception _
-      ;; Nothing useful to do while unwinding, and a terminal that is already
-      ;; closed throws on every one of these in JLine 4.
-      nil)))
+  (let [renderer-error (try
+                         (render/stop! renderer)
+                         nil
+                         (catch Exception error error))
+        attributes-error (try
+                           (term/set-attributes terminal original-attrs)
+                           nil
+                           (catch Exception error error))]
+    (cond
+      (and renderer-error attributes-error)
+      (ex-info "Could not fully restore the terminal"
+               {:attributes-error attributes-error}
+               renderer-error)
+
+      renderer-error renderer-error
+      attributes-error attributes-error
+      :else nil)))
+
+(defn- stop-input-loop!
+  [input-running? input-thread]
+  (reset! input-running? false)
+  (when-let [^Thread thread @input-thread]
+    (.interrupt thread)
+    (.join thread)
+    (reset! input-thread nil)))
+
+(defn- release-pending-suspend-requests!
+  [msg-chan]
+  (loop []
+    (when-let [pending-message (a/poll! msg-chan)]
+      (when (and (= ::suspend-request (:type pending-message))
+                 (:completion pending-message))
+        (deliver (:completion pending-message) true))
+      (recur))))
 
 (defn- add-shutdown-hook!
   "Register `f` to run on JVM shutdown, returning the thread so it can be
@@ -393,6 +472,28 @@
       (reset! last-size {:width width :height height})
       (a/put! msg-chan (window-size-msg width height)))))
 
+(defn- suspend-terminal!
+  [{:keys [terminal renderer original-attrs msg-chan running? input-running?
+           input-thread last-size mouse focus-reporting]}
+   callback]
+  (stop-input-loop! input-running? input-thread)
+  (try
+    (when-let [restore-error (restore-terminal! renderer terminal original-attrs)]
+      (throw restore-error))
+    (callback)
+    (finally
+      (term/enter-raw-mode terminal)
+      (render/start! renderer)
+      (when mouse
+        (render/enable-mouse! renderer mouse))
+      (when focus-reporting
+        (render/enable-focus-reporting! renderer))
+      (render/repaint! renderer)
+      (check-window-size! terminal msg-chan last-size)
+      (reset! input-running? true)
+      (reset! input-thread
+              (start-input-loop! terminal msg-chan running? input-running?)))))
+
 ;; ---------------------------------------------------------------------------
 ;; Main Program
 ;; ---------------------------------------------------------------------------
@@ -420,6 +521,14 @@
                       per character, so an application can tell a paste from
                       fast typing. Off by default, because a program that only
                       handles key presses would stop seeing pastes at all.
+     :kitty-keyboard - Ask the terminal for Kitty keyboard protocol reports
+                      (default: false). Terminals send the same bytes for
+                      Enter and Shift+Enter; with this on, a terminal that
+                      supports the protocol reports them as distinct keys
+                      (`{:type :enter :shift true}`), and likewise for other
+                      modified keys. Terminals that do not support it ignore
+                      the request. The mode is switched off again when the
+                      program exits or suspends.
      :overflow      - Which end to drop lines from when the view is taller than
                       the terminal: :top (default) keeps the last lines, which
                       suits an inline program; :bottom keeps the first ones,
@@ -451,7 +560,7 @@
   [{:keys [init update view running?] :as opts}]
   (let [opts (merge (default-opts) opts)
         {:keys [alt-screen mouse focus-reporting fps hide-cursor sanitize
-                bracketed-paste ctrl-c overflow]} opts
+                bracketed-paste kitty-keyboard ctrl-c overflow]} opts
 
         ;; Create terminal and save original attributes for restoration
         terminal (term/create-terminal)
@@ -472,6 +581,7 @@
                                          :hide-cursor hide-cursor
                                          :sanitize sanitize
                                          :bracketed-paste bracketed-paste
+                                         :kitty-keyboard kitty-keyboard
                                          :overflow overflow)
 
         ;; Message channel
@@ -479,6 +589,8 @@
 
         ;; State - use externally provided atom if given
         running? (or running? (atom true))
+        input-running? (atom true)
+        input-thread (atom nil)
         last-size (atom {:width 0 :height 0})
 
         ;; Initialize state
@@ -524,27 +636,40 @@
         ;; Tell the app about the terminal environment
         (a/put! msg-chan (msg/environment color-profile dark-background?))
 
-        ;; Start input loop (returns thread)
-        (let [^Thread input-thread (start-input-loop! terminal msg-chan running?)]
+        ;; Start input loop before commands so an init command can suspend too.
+        (reset! input-thread (start-input-loop! terminal
+                                                msg-chan
+                                                running?
+                                                input-running?))
 
-          ;; Execute init command
-          (execute-cmd! init-cmd msg-chan)
+        ;; Execute init command
+        (execute-cmd! init-cmd msg-chan)
 
-          ;; Render initial view
-          (render/render! renderer (view @state))
+        ;; Render initial view
+        (render/render! renderer (view @state))
 
-          ;; Main event loop
-          (run-event-loop! {:renderer renderer
-                            :update update
-                            :view view
-                            :state state
-                            :msg-chan msg-chan
-                            :running? running?
-                            :fps fps
-                            :ctrl-c ctrl-c})
-
-          ;; Interrupt input thread
-          (.interrupt input-thread))
+        ;; Main event loop
+        (run-event-loop! {:renderer renderer
+                          :update update
+                          :view view
+                          :state state
+                          :msg-chan msg-chan
+                          :running? running?
+                          :fps fps
+                          :ctrl-c ctrl-c
+                          :suspend! (fn [callback]
+                                      (suspend-terminal!
+                                       {:terminal terminal
+                                        :renderer renderer
+                                        :original-attrs original-attrs
+                                        :msg-chan msg-chan
+                                        :running? running?
+                                        :input-running? input-running?
+                                        :input-thread input-thread
+                                        :last-size last-size
+                                        :mouse mouse
+                                        :focus-reporting focus-reporting}
+                                       callback))})
 
         ;; Return final state
         @state
@@ -552,19 +677,23 @@
         (finally
           ;; Cleanup
           (reset! running? false)
-          (close! msg-chan)
+          (try
+            (stop-input-loop! input-running? input-thread)
+            (finally
+              (close! msg-chan)
+              (release-pending-suspend-requests! msg-chan)
 
-          ;; Put back the signal handlers we displaced, before the terminal
-          ;; closes under them
-          (term/restore-signal! :winch @previous-winch)
-          (term/restore-signal! :int @previous-int)
+              ;; Put back the signal handlers we displaced, before the terminal
+              ;; closes under them
+              (term/restore-signal! :winch @previous-winch)
+              (term/restore-signal! :int @previous-int)
 
-          ;; Restore the terminal, then stop guarding it
-          (restore-terminal! renderer terminal original-attrs)
-          (remove-shutdown-hook! shutdown-hook)
+              ;; Restore the terminal, then stop guarding it
+              (restore-terminal! renderer terminal original-attrs)
+              (remove-shutdown-hook! shutdown-hook)
 
-          ;; Close terminal
-          (term/close terminal))))))
+              ;; Close terminal
+              (term/close terminal))))))))
 
 ;; ---------------------------------------------------------------------------
 ;; Async Run

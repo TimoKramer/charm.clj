@@ -42,6 +42,17 @@
 (def disable-bracketed-paste (str CSI "?2004l"))
 
 ;; ---------------------------------------------------------------------------
+;; Kitty keyboard protocol (no JLine capability equivalent)
+;; ---------------------------------------------------------------------------
+
+;; Pushes the "disambiguate escape codes" flag, so modified keys that a legacy
+;; terminal cannot tell apart (Shift+Enter sends the same bytes as Enter)
+;; arrive as distinct `CSI codepoint ; modifiers u` sequences. The matching pop
+;; hands the terminal back to the shell as it was found.
+(def enable-kitty-keyboard (str CSI ">1u"))
+(def disable-kitty-keyboard (str CSI "<u"))
+
+;; ---------------------------------------------------------------------------
 ;; Window Title (OSC 2)
 ;; ---------------------------------------------------------------------------
 

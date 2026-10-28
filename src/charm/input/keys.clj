@@ -84,13 +84,54 @@
   [byte-val]
   (get ctrl-char->key byte-val {:type :unknown :code byte-val}))
 
+;; ---------------------------------------------------------------------------
+;; Kitty keyboard protocol
+;; ---------------------------------------------------------------------------
+
+(defn- kitty-modifier-flags
+  "Modifier bits are sent as 1 + (shift 1, alt 2, ctrl 4, super 8)."
+  [modifier-code]
+  (let [flags (dec modifier-code)]
+    (cond-> {}
+      (pos? (bit-and flags 1)) (assoc :shift true)
+      (pos? (bit-and flags 2)) (assoc :alt true)
+      (pos? (bit-and flags 4)) (assoc :ctrl true)
+      (pos? (bit-and flags 8)) (assoc :super true))))
+
+(defn- kitty-key-for-codepoint
+  [codepoint]
+  (cond
+    (or (= codepoint 10) (= codepoint 13)) {:type :enter}
+    (or (= codepoint 8) (= codepoint 127)) {:type :backspace}
+    (= codepoint 9) {:type :tab}
+    (= codepoint 27) {:type :escape}
+    (= codepoint 32) {:type :space}
+    (<= 0 codepoint 31) (get ctrl-char->key codepoint {:type :unknown})
+    (<= 32 codepoint Character/MAX_CODE_POINT)
+    {:type :runes :runes (String. (Character/toChars (int codepoint)))}
+    :else {:type :unknown}))
+
+(defn parse-kitty-key-sequence
+  "Parse a Kitty keyboard protocol key report (without ESC prefix), such as
+   \"[13;2u\" for Shift+Enter, into a key map. Returns nil for anything else.
+   Event-type and text sub-fields after the modifiers are accepted and ignored."
+  [seq-str]
+  (when-let [[_ codepoint-text modifier-text]
+             (re-matches #"\[(\d+)(?:;(\d+)(?::\d+)?(?:;[\d:]*)?)?u" seq-str)]
+    (let [codepoint (parse-long codepoint-text)
+          modifier-code (if modifier-text (parse-long modifier-text) 1)]
+      (merge (kitty-key-for-codepoint codepoint)
+             (kitty-modifier-flags modifier-code)))))
+
 (defn parse-escape-sequence
   "Parse an escape sequence (without ESC prefix) into a key map.
-   Uses JLine KeyMap for efficient lookup."
+   Kitty keyboard protocol reports are decoded directly; everything else uses
+   the JLine KeyMap for efficient lookup."
   ([seq-str]
    (parse-escape-sequence @km/default-keymap seq-str))
   ([keymap seq-str]
-   (km/lookup-or-unknown keymap seq-str)))
+   (or (parse-kitty-key-sequence seq-str)
+       (km/lookup-or-unknown keymap seq-str))))
 
 (defn ctrl-char?
   "Check if a byte value is a control character."

@@ -208,7 +208,7 @@ Run a TUI program in the background. Accepts the same options as `run` but retur
 
 ## Commands
 
-Commands are asynchronous operations that produce messages. They're returned from `init` and `update` functions.
+Commands produce messages and are returned from `init` and `update` functions. Most run asynchronously; `suspend-cmd` is a blocking terminal handoff.
 
 ### cmd
 
@@ -234,6 +234,24 @@ message, and a command that throws becomes an
 Commands are for I/O. A command that does heavy computation rather than blocking
 occupies a carrier thread while it runs, so that work belongs on a thread the
 application manages itself.
+
+### suspend-cmd
+
+```clojure
+(program/suspend-cmd f)
+```
+
+Create a command for a blocking callback that needs the terminal, such as
+launching `$EDITOR`. Charm stops and joins its input reader, stops renderer modes,
+and restores the terminal attributes before calling `f` on the event-loop thread.
+When `f` returns or throws, Charm restores raw mode, restarts rendering and input,
+and forces a full repaint. This keeps Charm from consuming keystrokes intended
+for the child process.
+
+Return a message from `f` to send it through the normal update loop, or return
+`nil` to send nothing. A thrown exception becomes an error message, as with
+`cmd`; the callback blocks the event loop until it finishes. It can be used in a
+`batch` or `sequence-cmds` command.
 
 ### batch
 
